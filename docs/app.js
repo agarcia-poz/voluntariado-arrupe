@@ -602,8 +602,14 @@ function vPanel() {
      <p class="small muted">La formación y la parte pastoral son las que más margen tienen este curso.</p></div>
   </div>`;
 }
+function insOpciones(i) {
+  const prefs = i.preferencias.slice(0, 3);
+  if (!prefs.length) return D.entidades.filter(e => e.activa).map(e => ({ v: e.id, l: e.nombre }));
+  const ops = prefs.map(id => ({ v: id, l: E(id).nombre + ' (' + E(id).ocupadas + '/' + E(id).cupo + ')' }));
+  return prefs.length > 1 ? [{ v: prefs.join(','), l: 'Todas las que eligió: ' + prefs.map(id => E(id).nombre).join(' + ') }].concat(ops) : ops;
+}
 function insEnts(i) {
-  if (!S.insEnts[i.id]) S.insEnts[i.id] = new Set(i.preferencias.slice(0, 3));
+  if (!S.insEnts[i.id]) { const o = insOpciones(i); S.insEnts[i.id] = new Set(i.preferencias.length ? o[0].v.split(',') : []); }
   return S.insEnts[i.id];
 }
 function vIns() {
@@ -617,7 +623,7 @@ function vIns() {
   const n = sel.size;
   const sinAvisar = asignadas ? list.filter(i => !i.avisado) : [];
   const bar = !list.length ? '' : preselect
-    ? `<div class="card" style="gap:10px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:grid;gap:2px;min-width:0;flex:1 1 280px"><h2>Preselección</h2><span class="muted small">Marca en cada inscripción las entidades (hasta tres) y selecciona las que quieras preseleccionar. No se envía nada a la persona hasta que lo hagáis desde Asignadas.</span></div>
+    ? `<div class="card" style="gap:10px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:grid;gap:2px;min-width:0;flex:1 1 280px"><h2>Preselección</h2><span class="muted small">Revisa el desplegable de cada inscripción y marca las que quieras preseleccionar. No se envía nada a la persona hasta que lo hagáis desde Asignadas.</span></div>
       <div class="actions"><button class="btn ghost sm" data-act="ins-all">${n === list.length ? 'Quitar selección' : `Seleccionar todas (${list.length})`}</button>
       <button class="btn primary" data-act="ins-pre" ${n ? '' : 'disabled'}>${ic('check', 18)}Preseleccionar${n ? ` (${n})` : ''}</button></div></div></div>`
     : asignadas ? `<div class="card" style="gap:10px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:grid;gap:2px;min-width:0;flex:1 1 280px"><h2>Correo de agradecimiento</h2><span class="muted small">Agradece la inscripción, confirma la preselección y anuncia que la coordinación se pondrá en contacto en breve.</span></div>
@@ -632,10 +638,13 @@ function vIns() {
       const st = i.estado === 'asignada' ? (i.avisado ? `<span class="pill ok">Correo enviado · ${fmt(i.avisado)}</span>` : '<span class="pill warn">Sin avisar</span>') : i.estado === 'nueva' ? '<span class="pill warn">Nueva</span>' : i.estado === 'en_espera' ? '<span class="pill info">En espera</span>' : '<span class="pill bad">Descartada</span>';
       const chk = (preselect || asignadas) ? `<input type="checkbox" data-inssel="${esc(i.id)}" ${sel.has(i.id) ? 'checked' : ''} aria-label="Seleccionar a ${esc(i.nombre)}" style="width:22px;height:22px;accent-color:var(--brand);margin-top:8px;flex:none">` : '';
       const es = preselect ? insEnts(i) : null;
-      const opciones = i.preferencias.length ? D.entidades.filter(e => i.preferencias.includes(e.id)) : D.entidades.filter(e => e.activa);
-      const entsHtml = preselect ? `<div style="display:grid;gap:6px"><span class="small muted">${i.preferencias.length ? 'Preseleccionar para (las que eligió)' : 'No se reconoció su preferencia' + (i.preferenciasTexto ? ' (“' + esc(i.preferenciasTexto) + '”)' : '') + '. Elige entidad'}${es.size ? '' : ' <b style="color:var(--warn)">· elige al menos una</b>'}:</span><div class="checks">${opciones.map(e => `<label style="${es.has(e.id) ? 'border-color:' + cvar(e.color) + ';background:color-mix(in srgb,' + cvar(e.color) + ' 10%,transparent)' : ''}"><input type="checkbox" data-insent="${esc(i.id)}|${esc(e.id)}" ${es.has(e.id) ? 'checked' : ''}>${esc(e.nombre)} <span class="hint tnum">${e.ocupadas}/${e.cupo} plazas</span></label>`).join('')}</div></div>`
+      const prefiere = `<div class="chips"><span class="small muted">Prefiere:</span>${i.preferencias.length ? i.preferencias.map(chip).join('') : `<span class="small">${esc(i.preferenciasTexto || '—')}</span>`}</div>`;
+      const valor = es ? [...es].join(',') : '';
+      const entsHtml = preselect ? prefiere + `<div class="field" style="max-width:520px"><label for="pre-${esc(i.id)}">Preseleccionar para</label><select id="pre-${esc(i.id)}" data-preent="${esc(i.id)}">
+          ${i.preferencias.length ? '' : `<option value="" ${valor ? '' : 'selected'}>— No se reconoció su preferencia: elige entidad —</option>`}
+          ${insOpciones(i).map(o => `<option value="${esc(o.v)}" ${o.v === valor ? 'selected' : ''}>${esc(o.l)}</option>`).join('')}</select></div>`
         : asignadas ? `<div class="chips"><span class="small muted">Preseleccionada para:</span>${ie.map(chip).join('')}</div>`
-        : `<div class="chips"><span class="small muted">Prefiere:</span>${i.preferencias.length ? i.preferencias.map(chip).join('') : `<span class="small">${esc(i.preferenciasTexto || '—')}</span>`}</div>`;
+        : prefiere;
       const acciones = i.estado === 'asignada' ? '' : `<div class="actions">${i.estado !== 'en_espera' && i.estado !== 'descartada' ? `<button class="btn ghost sm" data-insst="${esc(i.id)}|en_espera">Dejar en espera</button>` : ''}${i.estado !== 'descartada' ? `<button class="btn ghost sm" data-insst="${esc(i.id)}|descartada">Descartar</button>` : `<button class="btn ghost sm" data-insst="${esc(i.id)}|nueva">Recuperar</button>`}</div>`;
       return `<div class="card" style="${sel.has(i.id) ? 'border-color:var(--brand)' : ''}"><div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">${chk}<div class="av" style="background:var(--brand)">${esc(initials(i.nombre))}</div><div style="flex:1 1 220px;min-width:0;display:grid;gap:2px"><h3>${esc(i.nombre || '(sin nombre)')}</h3><span class="small muted">${esc(i.curso)} · ${esc(i.email || 'sin correo')} · ${fmt(i.fecha)}</span></div>${st}</div>
         ${i.motivo ? `<p>“${esc(i.motivo)}”</p>` : ''}${entsHtml}${acciones}</div>`;
@@ -1179,6 +1188,7 @@ root.addEventListener('change', ev => {
     rd.readAsDataURL(f);
   }
   if (t.dataset.inssel) { const sel = S.insSel[S.insFilter]; t.checked ? sel.add(t.dataset.inssel) : sel.delete(t.dataset.inssel); S.thanksConfirm = false; render(); return; }
+  if (t.dataset.preent) { S.insEnts[t.dataset.preent] = new Set(t.value ? t.value.split(',') : []); S.insSel[S.insFilter] && S.insSel[S.insFilter].add(t.dataset.preent); render(); return; }
   if (t.dataset.insent) { const [id, ent] = t.dataset.insent.split('|'); const set = S.insEnts[id] || (S.insEnts[id] = new Set()); if (t.checked) { if (set.size >= 3) { t.checked = false; return toast('Como máximo tres entidades por persona'); } set.add(ent); S.insSel[S.insFilter] && S.insSel[S.insFilter].add(id); } else set.delete(ent); render(); return; }
   if (t.dataset.isel) { t.checked ? S.isel.set.add(t.dataset.isel) : S.isel.set.delete(t.dataset.isel); render(); return; }
   if (t.dataset.att) { t.checked ? S.att.sel.add(t.dataset.att) : S.att.sel.delete(t.dataset.att); }
