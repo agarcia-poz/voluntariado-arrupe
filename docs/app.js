@@ -612,6 +612,27 @@ function insEnts(i) {
   if (!S.insEnts[i.id]) { const o = insOpciones(i); S.insEnts[i.id] = new Set(i.preferencias.length ? o[0].v.split(',') : []); }
   return S.insEnts[i.id];
 }
+function insResumen(list, sel) {
+  const all = D.pastoral.inscripciones;
+  const pend = all.filter(i => i.estado === 'nueva' || i.estado === 'en_espera');
+  const entsDe = i => (i.entidades && i.entidades.length) ? i.entidades : String(i.entidad || '').split(',').filter(Boolean);
+  const nuevos = {};
+  [...sel].forEach(id => { const i = list.find(x => x.id === id); if (i) [...insEnts(i)].forEach(e => nuevos[e] = (nuevos[e] || 0) + 1); });
+  const rows = D.entidades.filter(e => e.activa).map(e => ({
+    e, pend: pend.filter(i => i.preferencias.includes(e.id)).length, total: all.filter(i => i.preferencias.includes(e.id)).length,
+    pre: all.filter(i => i.estado === 'asignada' && entsDe(i).includes(e.id)).length, add: nuevos[e.id] || 0
+  })).sort((a, b) => b.pend - a.pend || b.total - a.total);
+  const max = Math.max(1, ...rows.map(r => r.pend));
+  return `<div class="card" style="gap:10px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><h2>Interés por entidad</h2><span class="hint">Ordenado por inscripciones pendientes que la eligieron</span></div>
+  <div class="table-wrap" style="border:0"><table class="resumen" style="min-width:640px"><thead><tr><th>Entidad</th><th>Interesados pendientes</th><th>Preseleccionados</th><th>Plazas ocupadas</th></tr></thead><tbody>
+  ${rows.map(r => { const libre = r.e.cupo - r.e.ocupadas, tras = r.e.ocupadas + r.add, pasa = r.add && tras > r.e.cupo; return `<tr style="--c:${cvar(r.e.color)}">
+    <td><span class="chip" style="--c:${cvar(r.e.color)}">${esc(r.e.nombre)}</span></td>
+    <td><div style="display:flex;align-items:center;gap:10px"><b class="tnum" style="min-width:22px">${r.pend}</b><div class="bar" style="flex:1;min-width:60px"><i style="width:${r.pend / max * 100}%"></i></div><span class="hint tnum" title="Total de inscripciones que la eligieron">${r.total} en total</span></div></td>
+    <td class="tnum"><b>${r.pre}</b>${r.add ? ` <span class="pill info tnum">+${r.add} seleccionad${r.add === 1 ? 'a' : 'as'}</span>` : ''}</td>
+    <td><div style="display:flex;align-items:center;gap:10px"><span class="tnum" style="min-width:52px"><b>${r.e.ocupadas}</b>/${r.e.cupo}</span><div class="bar" style="flex:1;min-width:60px;position:relative"><i style="width:${r.e.cupo ? Math.min(100, r.e.ocupadas / r.e.cupo * 100) : 0}%"></i>${r.add ? `<i style="position:absolute;top:0;left:${r.e.cupo ? Math.min(100, r.e.ocupadas / r.e.cupo * 100) : 0}%;width:${r.e.cupo ? Math.max(0, Math.min(100, tras / r.e.cupo * 100) - Math.min(100, r.e.ocupadas / r.e.cupo * 100)) : 0}%;opacity:.45"></i>` : ''}</div>
+      <span class="small ${pasa ? '' : 'muted'}" style="${pasa ? 'color:var(--bad);font-weight:600' : ''}">${pasa ? 'se pasa del cupo' : libre > 0 ? `quedan ${libre}` : 'completa'}</span></div></td></tr>`; }).join('')}
+  </tbody></table></div><p class="hint">Plazas ocupadas incluye a quienes ya sirven en la entidad, también la coordinación. Lo marcado en azul claro es lo que sumaría tu selección actual.</p></div>`;
+}
 function vIns() {
   const all = D.pastoral.inscripciones;
   const F = [['nueva', 'Nuevas'], ['en_espera', 'En espera'], ['asignada', 'Asignadas'], ['descartada', 'Descartadas']];
@@ -632,7 +653,7 @@ function vIns() {
       ${S.thanksConfirm ? `<div class="confirm" style="background:var(--brand-soft)"><span>Vas a enviar ${n} ${n === 1 ? 'correo' : 'correos'}${[...sel].some(id => (list.find(i => i.id === id) || {}).avisado) ? ', y alguna persona ya lo había recibido' : ''}. ¿Seguimos?</span><button class="btn primary sm" data-act="ins-thanks-yes">Sí, enviar</button><button class="btn ghost sm" data-act="ins-thanks-no">Cancelar</button></div>` : ''}</div>`
     : '';
   return header('Servicio de Pastoral', 'Inscripciones', 'Llegan solas desde el formulario de Google y os avisamos por correo. Preseleccionad en bloque y, cuando queráis, enviad el correo de agradecimiento desde Asignadas.') +
-    `<div class="filters" role="group" aria-label="Filtrar inscripciones">${F.map(([k, l]) => `<button data-insf="${k}" aria-pressed="${S.insFilter === k}">${l} · ${all.filter(i => i.estado === k).length}</button>`).join('')}</div>` + bar +
+    `<div class="filters" role="group" aria-label="Filtrar inscripciones">${F.map(([k, l]) => `<button data-insf="${k}" aria-pressed="${S.insFilter === k}">${l} · ${all.filter(i => i.estado === k).length}</button>`).join('')}</div>` + (preselect ? insResumen(list, sel) : '') + bar +
     (list.length ? `<div class="grid">${list.map(i => {
       const ie = (i.entidades && i.entidades.length) ? i.entidades : String(i.entidad || '').split(',').filter(Boolean);
       const st = i.estado === 'asignada' ? (i.avisado ? `<span class="pill ok">Correo enviado · ${fmt(i.avisado)}</span>` : '<span class="pill warn">Sin avisar</span>') : i.estado === 'nueva' ? '<span class="pill warn">Nueva</span>' : i.estado === 'en_espera' ? '<span class="pill info">En espera</span>' : '<span class="pill bad">Descartada</span>';
