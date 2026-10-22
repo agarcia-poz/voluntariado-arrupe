@@ -52,7 +52,7 @@ try {
   CODE = sessionStorage.getItem('arrupe-code');
 } catch (e) { }
 let DEMO_START = null;
-try { const q = new URL(location.href).searchParams.get('demo'); if (q === 'coord' || q === 'vol') DEMO_START = q; } catch (e) { }
+try { const q = new URL(location.href).searchParams.get('demo'); if (q === 'coord' || q === 'vol' || q === 'pastoral') DEMO_START = q; } catch (e) { }
 function clearCode() { CODE = null; try { sessionStorage.removeItem('arrupe-code'); } catch (e) { } }
 
 /* ───────── utilidades ───────── */
@@ -100,6 +100,44 @@ function demoProximos(role) {
   T.filter(t => ent.includes(t.entidad)).forEach(t => { if (role === 'vol' && t.id === 't2') return; demoOcc(t, 14).forEach((f, i) => out.push({ turno: t.id, entidad: t.entidad, fecha: f, inicio: t.inicio, fin: t.fin, lugar: t.lugar, nota: t.nota, respuesta: i === 0 && t.id === 't1' ? 'sí' : '' })); });
   return out.sort((a, b) => (a.fecha + a.inicio) < (b.fecha + b.inicio) ? -1 : 1);
 }
+function demoPastoral(base) {
+  const P = (email, nombre, curso, rol, ents, cert, comp, horas, extra) => Object.assign({ email, nombre, curso, rol, estado: 'activo', coordEnts: [], alta: dIso(-30), asignaciones: ents.map(e => ({ entidad: e, estado: 'activa' })),
+    docs: { cert: { estado: cert, url: cert === 'pend' ? '' : '#', fecha: dIso(-10) }, comp: { estado: comp, url: '', fecha: dIso(-8) } }, horas, telefono: '6' + String(Math.abs(nombre.length * 7919)).padStart(8, '1').slice(0, 8), emailContacto: '', emergencia: '',
+    compromiso: comp === 'ok' ? { dni: '••••••••X', fecha: dIso(-8), hasta: '2027-06-30', actividades: '' } : null }, extra || {});
+  const personas = [
+    P('andres@demo', 'Andrés García Pozas', '', 'pastoral', [], 'pend', 'pend', 0, { docs: { cert: { estado: 'pend', url: '' }, comp: { estado: 'pend', url: '' } } }),
+    P('clara.ortega@cusafa.es', 'Clara Ortega Vílchez', '4.º Ed. Infantil', 'coord', ['hogar'], 'ok', 'ok', 14, { coordEnts: ['hogar'] }),
+    P('pablo.ruiz@cusafa.es', 'Pablo Ruiz Fernández', '4.º Ed. Primaria', 'coord', ['res', 'alz'], 'ok', 'ok', 22, { coordEnts: ['res'] }),
+    P('lucia.martos@cusafa.es', 'Lucía Martos Ortega', '2.º Ed. Infantil', 'vol', ['hogar', 'apoyo'], 'ok', 'pend', 13),
+    P('javier.cuesta@cusafa.es', 'Javier Cuesta Ruiz', '1.º Ed. Primaria', 'vol', ['hogar'], 'rev', 'ok', 4),
+    P('carmen.vilches@cusafa.es', 'Carmen Vilches Ramos', '3.º Ed. Primaria', 'vol', ['hogar', 'ute'], 'ok', 'ok', 16),
+    P('ines.rubio@cusafa.es', 'Inés Rubio Cózar', '2.º Ed. Primaria', 'vol', ['apoyo'], 'ok', 'ok', 8),
+    P('sergio.ballesteros@cusafa.es', 'Sergio Ballesteros León', '4.º Ed. Primaria', 'vol', ['ilu'], 'rev', 'ok', 10),
+    P('daniel.moya@cusafa.es', 'Daniel Moya Peña', '3.º Ed. Infantil', 'vol', ['apro'], 'ok', 'ok', 12, { asignaciones: [{ entidad: 'apro', estado: 'activa' }, { entidad: 'down', estado: 'solicitada' }] }),
+    P('paula.rentero@gmail.com', 'Paula Rentero Gil', '1.º Ed. Primaria', 'vol', [], 'pend', 'pend', 0, { estado: 'pendiente' })
+  ];
+  const ins = (id, nombre, curso, dias, prefs, motivo, estado, entidad) => ({ id, fecha: dIso(-dias), nombre, email: nombre.split(' ')[0].toLowerCase() + '@cusafa.es', curso, preferencias: prefs, preferenciasTexto: '', motivo, estado, entidad: entidad || '' });
+  return Object.assign(base, {
+    me: { email: 'andres@demo', nombre: 'Andrés García Pozas', rol: 'pastoral', estado: 'activo', curso: '', coordEnts: [], foto: '', telefono: '', emailContacto: '', emergenciaNombre: '', emergenciaTelefono: '', avisos: true },
+    mio: { asignaciones: [], docs: { cert: { estado: 'pend' }, comp: { estado: 'pend' } }, horas: [], reflexiones: [], compromiso: null, turnos: [], proximos: [], misSubidas: 0 },
+    pastoral: {
+      personas,
+      inscripciones: [
+        ins('i1', 'Nerea Castro Vela', '1.º Ed. Infantil', 1, ['hogar', 'apoyo'], 'Quiero estar con niños fuera del aula antes de las prácticas.', 'nueva'),
+        ins('i2', 'Hugo Prieto Lanza', '2.º Ed. Primaria', 2, ['apro'], 'Juego al fútbol y me gustaría compartirlo.', 'nueva'),
+        ins('i3', 'Sofía Martín Arjona', '3.º Ed. Primaria', 3, ['ute', 'down'], 'Me lo recomendó una compañera que estuvo el curso pasado.', 'nueva'),
+        ins('i4', 'Irene Sola Medina', '1.º Ed. Primaria', 5, ['res'], 'Mi abuela vive en una residencia y sé lo que significa una visita.', 'en_espera'),
+        ins('i5', 'Álvaro Pastor Ruiz', '4.º Ed. Infantil', 9, ['ute'], 'Quiero conocer otras realidades.', 'asignada', 'ute')
+      ],
+      invitaciones: [
+        { codigo: 'KGS-DVK', email: 'clara.ortega@cusafa.es', nombre: 'Clara Ortega', entidades: ['hogar'], estado: 'usada', creado: dIso(-1), usadoPor: 'clara.ortega@cusafa.es', usadoEn: dIso(0) },
+        { codigo: '95V-K53', email: 'pablo.ruiz@cusafa.es', nombre: 'Pablo Ruiz', entidades: ['res'], estado: 'usada', creado: dIso(-1), usadoPor: 'pablo.personal@gmail.com', usadoEn: dIso(0) },
+        { codigo: 'P9A-H45', email: 'ana.sanchez@cusafa.es', nombre: 'Ana Sánchez', entidades: ['down'], estado: 'enviada', creado: dIso(-1), usadoPor: '', usadoEn: '' }
+      ],
+      sesiones: [], hojaUrl: '', carpetaUrl: '', multimediaUrl: ''
+    }
+  });
+}
 function demoData(role) {
   const base = {
     config: { horasReferencia: 20, tiposDoc: { cert: 'Certificado de delitos de naturaleza sexual', comp: 'Compromiso de voluntariado' }, finCurso: '2027-06-30', hoy: dIso(0) },
@@ -111,6 +149,7 @@ function demoData(role) {
       { id: 'n4', fecha: dIso(28), titulo: 'Oración del voluntariado', detalle: 'Último jueves de mes · Capilla · durante el recreo', tipo: 'Oración' }
     ]
   };
+  if (role === 'pastoral') return demoPastoral(base);
   if (role === 'coord') {
     const equipo = [
       ['clara.ortega@cusafa.es', 'Clara Ortega Vílchez', '4.º Ed. Infantil', [], 'ok', 'ok', 14, true, false],
@@ -182,6 +221,18 @@ function demoApi(action, d) {
     case 'recordarDocumentos': return { enviados: D2.coord[d.entidad].equipo.filter(p => p.cert !== 'ok' || p.comp !== 'ok').length };
     case 'darBienvenida': D2.coord[d.entidad].equipo.forEach(p => { if (p.email === d.email) p.nuevo = false; }); return D2;
     case 'guardarMisDatos': Object.assign(me, d); return D2;
+    case 'asignarInscripcion': D2.pastoral.inscripciones.forEach(i => { if (i.id === d.id) { i.estado = 'asignada'; i.entidad = d.entidad; } }); return D2;
+    case 'estadoInscripcion': D2.pastoral.inscripciones.forEach(i => { if (i.id === d.id) i.estado = d.estado; }); return D2;
+    case 'guardarPersona': { let p = D2.pastoral.personas.find(x => x.email === d.email); if (!p) { p = { email: d.email, alta: todayISO(), asignaciones: [], docs: { cert: { estado: 'pend', url: '' }, comp: { estado: 'pend', url: '' } }, horas: 0, telefono: '', emergencia: '', compromiso: null }; D2.pastoral.personas.push(p); }
+      Object.assign(p, { nombre: d.nombre, curso: d.curso, rol: d.rol, estado: d.estado, coordEnts: d.coordEnts, asignaciones: d.asignaciones.map(e => ({ entidad: e, estado: 'activa' })) }); return D2; }
+    case 'revisarDocumento': D2.pastoral.personas.forEach(p => { if (p.email === d.email) p.docs[d.tipo].estado = d.valido ? 'ok' : 'rech'; }); return D2;
+    case 'resolverSolicitud': D2.pastoral.personas.forEach(p => { if (p.email === d.email) p.asignaciones = p.asignaciones.map(a => a.entidad === d.entidad && a.estado === 'solicitada' ? (d.aceptar ? { entidad: a.entidad, estado: 'activa' } : null) : a).filter(Boolean); }); return D2;
+    case 'crearInvitaciones': d.lista.forEach(x => D2.pastoral.invitaciones.unshift({ codigo: Math.random().toString(36).slice(2, 5).toUpperCase() + '-' + Math.random().toString(36).slice(2, 5).toUpperCase(), email: x.email, nombre: x.nombre, entidades: x.entidades, estado: 'enviada', creado: todayISO(), usadoPor: '', usadoEn: '' })); return D2;
+    case 'reenviarInvitacion': return D2;
+    case 'anularInvitacion': D2.pastoral.invitaciones.forEach(i => { if (i.codigo === d.codigo) i.estado = 'anulada'; }); return D2;
+    case 'guardarEntidad': { const e = D2.entidades.find(x => x.id === d.id); if (e) Object.assign(e, d, { cupo: Number(d.cupo) || 0 }); else D2.entidades.push(Object.assign({ coordinadores: [], ocupadas: 0 }, d, { cupo: Number(d.cupo) || 0 })); return D2; }
+    case 'guardarNoticia': if (d.id) D2.noticias.forEach(n => { if (n.id === d.id) Object.assign(n, d); }); else D2.noticias.push(Object.assign({}, d, { id: 'n' + Date.now() })); D2.noticias.sort((x, y) => x.fecha < y.fecha ? -1 : 1); return D2;
+    case 'borrarNoticia': D2.noticias = D2.noticias.filter(n => n.id !== d.id); return D2;
     case 'firmarCompromiso': D2.mio.compromiso = { nombre: d.nombre, dni: d.dni, telefono: d.telefono, curso: d.curso, entidades: D2.mio.asignaciones.filter(x => x.estado === 'activa').map(x => x.entidad), actividades: d.actividades, desde: todayISO(), hasta: '2027-06-30', fecha: todayISO() }; D2.mio.docs.comp = { estado: 'ok', fecha: todayISO(), nota: '' }; return D2;
     case 'apuntarTurno': D2.mio.turnos.forEach(t => { if (t.id === d.turno) t.apuntado = !!d.apuntar; }); return D2;
     case 'confirmarAsistencia': D2.mio.proximos.forEach(p => { if (p.turno === d.turno && p.fecha === d.fecha) p.respuesta = d.respuesta; }); return D2;
@@ -324,7 +375,7 @@ function shell(content) {
   const items = n.map(([k, l, i]) => { const b = badge(k); return `<button data-go="${k}" ${S.view === k ? 'aria-current="page"' : ''}>${ic(i)}<span>${l}</span>${b ? `<span class="count">${b}</span>` : ''}</button>`; }).join('');
   const tabs = n.map(([k, l]) => { const b = badge(k); return `<button data-go="${k}" ${S.view === k ? 'aria-current="page"' : ''}>${l}${b ? ` (${b})` : ''}</button>`; }).join('');
   const demoBar = DEMO ? `<div class="demo-bar" role="region" aria-label="Modo demostración"><span><b>Modo demostración</b> · datos ficticios, no se guarda nada</span>
-    <div class="seg"><button data-demo="coord" aria-pressed="${DEMO.me.rol === 'coord'}">Coordinación</button><button data-demo="vol" aria-pressed="${DEMO.me.rol === 'vol'}">Voluntariado</button><button data-act="demo-exit">Salir</button></div></div>` : '';
+    <div class="seg"><button data-demo="pastoral" aria-pressed="${DEMO.me.rol === 'pastoral'}">Pastoral</button><button data-demo="coord" aria-pressed="${DEMO.me.rol === 'coord'}">Coordinación</button><button data-demo="vol" aria-pressed="${DEMO.me.rol === 'vol'}">Voluntariado</button><button data-act="demo-exit">Salir</button></div></div>` : '';
   return demoBar + `<div class="mtop"><div class="row"><div class="logo-wrap"><img src="${LOGO}" alt="Pastoral CUSAFA"></div><div style="display:flex;gap:10px;align-items:center"><button class="signout" data-act="signout">Salir</button>${avatar(me, 'var(--brand)')}</div></div><nav class="tabs" aria-label="Secciones">${tabs}</nav></div>
   <div class="shell">
     <aside class="side"><div class="logo-wrap"><img src="${LOGO}" alt="Pastoral · Centro Universitario Sagrada Familia"></div>
@@ -500,7 +551,7 @@ function vPanel() {
   const multi = act.filter(p => p.asignaciones.filter(a => a.estado === 'activa').length > 1).length;
   const nIns = D.pastoral.inscripciones.filter(i => i.estado === 'nueva').length;
   const pp = pendientesPastoral();
-  return header('Servicio de Pastoral', 'Panel del Voluntariado Arrupe', 'Lo que necesita una mirada vuestra hoy.', `<button class="btn primary" data-demo="coord">${ic('users', 18)}Ver demostración</button><a class="btn ghost" href="${safeUrl(D.pastoral.hojaUrl)}" target="_blank" rel="noopener">${ic('ext', 18)}Hoja de datos</a><a class="btn ghost" href="${safeUrl(D.pastoral.carpetaUrl)}" target="_blank" rel="noopener">${ic('lock', 18)}Carpeta de documentos</a>${D.pastoral.multimediaUrl ? `<a class="btn ghost" href="${safeUrl(D.pastoral.multimediaUrl)}" target="_blank" rel="noopener">${ic('camera', 18)}Fotos y vídeos</a>` : ''}`) +
+  return header('Servicio de Pastoral', 'Panel del Voluntariado Arrupe', 'Lo que necesita una mirada vuestra hoy.', `${DEMO ? '' : `<button class="btn primary" data-demo="coord">${ic('users', 18)}Ver demostración</button>`}${D.pastoral.hojaUrl ? `<a class="btn ghost" href="${safeUrl(D.pastoral.hojaUrl)}" target="_blank" rel="noopener">${ic('ext', 18)}Hoja de datos</a>` : ''}${D.pastoral.carpetaUrl ? `<a class="btn ghost" href="${safeUrl(D.pastoral.carpetaUrl)}" target="_blank" rel="noopener">${ic('lock', 18)}Carpeta de documentos</a>` : ''}${D.pastoral.multimediaUrl ? `<a class="btn ghost" href="${safeUrl(D.pastoral.multimediaUrl)}" target="_blank" rel="noopener">${ic('camera', 18)}Fotos y vídeos</a>` : ''}`) +
     `<div class="kpis"><div class="kpi ${nIns ? 'alert' : ''}"><b class="tnum">${nIns}</b><span>inscripciones por preseleccionar</span></div>
    <div class="kpi"><b class="tnum">${act.length}</b><span>personas sirviendo · ${multi} en varias</span></div>
    <div class="kpi ${inc ? 'alert' : ''}"><b class="tnum">${inc}</b><span>con documentación incompleta</span></div>
@@ -550,7 +601,7 @@ function editPersona() {
   const act = p.asignaciones.filter(a => a.estado === 'activa').map(a => a.entidad);
   const ents = D.entidades;
   const docRow = t => { const d = p.docs[t]; return `<div class="row"><div class="grow"><b>${esc(D.config.tiposDoc[t])}</b>${d.fecha ? `<span class="small muted">Subido el ${fmtLong(d.fecha)}</span>` : ''}</div>${pill(d.estado)}
-    ${d.url ? `<a class="btn ghost sm" href="${safeUrl(d.url)}" target="_blank" rel="noopener">${ic('ext', 16)}Abrir archivo</a>` : ''}
+    ${d.url ? (DEMO ? `<span class="btn ghost sm" aria-disabled="true" title="En la demostración no hay archivos">${ic('ext', 16)}Abrir archivo</span>` : `<a class="btn ghost sm" href="${safeUrl(d.url)}" target="_blank" rel="noopener">${ic('ext', 16)}Abrir archivo</a>`) : ''}
     ${d.url && d.estado !== 'ok' ? `<button class="btn primary sm" data-doc="${esc(p.email)}|${t}|1">Validar</button>` : ''}
     ${d.url && d.estado !== 'rech' ? (S.rejecting === t ? `<span class="actions"><input type="text" id="rej-${t}" placeholder="Motivo (le llegará por correo)" style="min-width:200px"><button class="btn danger sm" data-doc="${esc(p.email)}|${t}|0">Pedir que lo repita</button></span>` : `<button class="btn ghost sm" data-askrej="${t}">Rechazar</button>`) : ''}</div>`; };
   return `<div class="card" style="border-color:var(--brand)"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h2>${isNew ? 'Nueva persona' : esc(p.nombre)}</h2><button class="btn ghost sm" data-act="close-editp">Cerrar</button></div>
