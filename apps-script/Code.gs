@@ -299,10 +299,11 @@ const ACCIONES = {
     const docs = rows_('Documentos');
     const faltan = equipo_(ent.id).filter(u => Object.keys(TIPOS_DOC).some(t => (docs.find(x => x.email === u.email && x.tipo === t) || {}).estado !== 'ok'));
     faltan.forEach(u => {
-      const pend = Object.keys(TIPOS_DOC).filter(t => (docs.find(x => x.email === u.email && x.tipo === t) || {}).estado !== 'ok').map(t => '<li>' + TIPOS_DOC[t] + '</li>').join('');
+      const acc = { cert: 'Subir tu certificado de delitos de naturaleza sexual', comp: 'Firmar tu compromiso de voluntariado (se hace en la propia app, en Documentos)' };
+      const pend = Object.keys(TIPOS_DOC).filter(t => (docs.find(x => x.email === u.email && x.tipo === t) || {}).estado !== 'ok').map(t => '<li>' + acc[t] + '</li>').join('');
       mail_([u.email], 'Te falta documentación del Voluntariado Arrupe',
-        `<p>Hola, ${esc_(u.nombre.split(' ')[0])}:</p><p>Para seguir sirviendo en <b>${esc_(ent.nombre)}</b> necesitamos que subas:</p><ul>${pend}</ul><p>Solo el Servicio de Pastoral puede ver tus archivos.</p>`,
-        'Subir documentos', 'docs');
+        `<p>Hola, ${esc_(u.nombre.split(' ')[0])}:</p><p>Para seguir sirviendo en <b>${esc_(ent.nombre)}</b> te falta:</p><ul>${pend}</ul><p>Solo el Servicio de Pastoral puede ver tu documentación.</p>`,
+        'Completar mi documentación', 'docs');
     });
     log_(me, 'recordarDocumentos', ent.id + ' · ' + faltan.length);
     return { enviados: faltan.length };
@@ -315,7 +316,7 @@ const ACCIONES = {
     mail_([u.email], 'Bienvenida a ' + ent.nombre,
       `<p>Hola, ${esc_(u.nombre.split(' ')[0])}:</p><p>Soy ${esc_(me.nombre)} y coordino el voluntariado de <b>${esc_(ent.nombre)}</b>. ¡Qué alegría contar contigo!</p>
        <p><b>Horario:</b> ${esc_(ent.horario)}<br><b>Lugar:</b> ${esc_(ent.lugar)}</p>
-       <p>Antes de empezar, sube en la app tu certificado de delitos de naturaleza sexual y el compromiso de voluntariado. Puedes escribirme respondiendo a este correo.</p>`,
+       <p>Antes de empezar, entra en la app para subir tu certificado de delitos de naturaleza sexual y firmar el compromiso de voluntariado. Puedes escribirme respondiendo a este correo.</p>`,
       'Abrir la app', 'vinicio', me.email);
     withLock_(() => updateWhere_('Asignaciones', r => r.email === u.email && r.entidad === ent.id && r.estado === 'activa', { origen: 'bienvenida enviada' }));
     log_(me, 'darBienvenida', u.email);
@@ -831,10 +832,10 @@ function avisoAusencia_(t, fecha, u) {
     `<p><b>${esc_(u.nombre || u.email)}</b> ha avisado de que <b>no podrá ir</b> al voluntariado de <b>${esc_(ent.nombre)}</b> el ${esc_(fechaLarga_(fecha))} (${esc_(hhmm_(t.inicio))}–${esc_(hhmm_(t.fin))}).</p><p>Puedes responder a este correo para escribirle.</p>`,
     'Ver horarios', 'chorario', u.email);
 }
-function fechaLarga_(iso) {
+function fechaLarga_(iso, conAnio) {
   const d = new Date(iso + 'T12:00:00Z');
   const m = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
-  return DIAS[diaSemana_(iso)] + ' ' + d.getUTCDate() + ' de ' + m[d.getUTCMonth()];
+  return (conAnio ? '' : DIAS[diaSemana_(iso)] + ' ') + d.getUTCDate() + ' de ' + m[d.getUTCMonth()] + (conAnio ? ' de ' + d.getUTCFullYear() : '');
 }
 function secreto_() { const p = PropertiesService.getScriptProperties(); let s = p.getProperty('SECRET'); if (!s) { s = Utilities.getUuid() + Utilities.getUuid(); p.setProperty('SECRET', s); } return s; }
 function firmaEnlace_(msg) { return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(msg, secreto_())).replace(/=+$/, '').slice(0, 24); }
@@ -920,8 +921,8 @@ function mailCompromiso_(rec, ents) {
      <p style="margin:0 0 8px"><b>Entre</b> el centro SAFA-Úbeda (Fundación Escuelas Profesionales de la Sagrada Familia, CIF G23633266, Avda. de Cristo Rey, 25, 23400 Úbeda) <b>y</b> ${esc_(rec.nombre)}, con documento ${esc_(String(rec.dni).replace(/^'/, ''))}.</p>
      <p style="margin:0 0 6px"><b>Voluntariado en:</b></p><ul style="margin:0 0 8px">${nombres}</ul>
      ${rec.actividades ? `<p style="margin:0 0 8px"><b>Actividades:</b> ${esc_(rec.actividades)}</p>` : ''}
-     <p style="margin:0 0 8px"><b>Vigencia:</b> desde el ${esc_(fechaLarga_(String(rec.desde).replace(/^'/, '')))} hasta el ${esc_(fechaLarga_(CONFIG.FIN_CURSO))}.</p>
-     <p style="margin:0"><b>Aceptado:</b> derechos y obligaciones de la persona voluntaria y de la entidad, confidencialidad, carácter gratuito y tratamiento de datos. <b>Firma:</b> ${esc_(rec.firma)} · ${esc_(Utilities.formatDate(rec.fecha, 'Europe/Madrid', 'dd/MM/yyyy HH:mm'))}</p></div>
+     <p style="margin:0 0 8px"><b>Vigencia:</b> del ${esc_(fechaLarga_(String(rec.desde).replace(/^'/, ''), true))} al ${esc_(fechaLarga_(CONFIG.FIN_CURSO, true))}.</p>
+     <p style="margin:0"><b>Aceptado:</b> derechos y obligaciones de la persona voluntaria y de la entidad, confidencialidad, carácter gratuito y tratamiento de datos. <b>Firma:</b> ${esc_(rec.firma)} · ${esc_(Utilities.formatDate(rec.fecha, 'Europe/Madrid', "dd/MM/yyyy 'a las' HH:mm"))}</p></div>
      <p>Puedes dejar este compromiso cuando quieras, avisando con al menos 15 días de antelación.</p>`,
     'Abrir la app', 'docs');
 }
@@ -1008,7 +1009,7 @@ function avisarAsignacion_(email, nombre, ent) {
   mail_([email], 'Ya formas parte de ' + ent.nombre,
     `<p>Hola, ${esc_(String(nombre).split(' ')[0])}:</p><p>Te damos la bienvenida al Voluntariado Arrupe en <b>${esc_(ent.nombre)}</b>.</p>
      <p><b>Horario:</b> ${esc_(ent.horario)}<br><b>Lugar:</b> ${esc_(ent.lugar)}</p>
-     <p>Entra en la app con esta cuenta de Google para subir tu documentación y ver tus horas.${coords.length ? ' Te escribirá ' + esc_(coords.map(c => c.nombre).join(' y ')) + ', que coordina esta entidad.' : ''}</p>`,
+     <p>Entra en la app con esta cuenta de Google para completar tu documentación, ver tu horario y tus horas.${coords.length ? ' Te escribirá ' + esc_(coords.map(c => c.nombre).join(' y ')) + ', que coordina esta entidad.' : ''}</p>`,
     'Entrar en la app', 'vinicio');
   if (coords.length) mail_(coords.map(c => c.email), 'Nueva incorporación en ' + ent.nombre,
     `<p>Pastoral ha incorporado a <b>${esc_(nombre)}</b> (${esc_(email)}) a <b>${esc_(ent.nombre)}</b>. Escríbele para darle la bienvenida.</p>`,
