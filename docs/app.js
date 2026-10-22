@@ -44,7 +44,7 @@ const IG = 'https://www.instagram.com/unisafa/';
 
 /* ───────── estado ───────── */
 let TOKEN = null, D = null;
-const S = { welcome: null, wMsg: '', wWa: undefined, editInfo: false, gal: {}, cf: {}, resign: false, tf: null, delT: null, delM: null, upMsg: '', fent: null, view: null, ent: null, leaving: null, cent: null, assigning: null, insFilter: 'nueva', q: '', editP: null, editE: null, editN: null, delN: null, delSes: null, rejecting: null, att: null, err: '' };
+const S = { insSel: {}, insEnts: {}, thanksConfirm: false, welcome: null, wMsg: '', wWa: undefined, editInfo: false, gal: {}, cf: {}, resign: false, tf: null, delT: null, delM: null, upMsg: '', fent: null, view: null, ent: null, leaving: null, cent: null, assigning: null, insFilter: 'nueva', q: '', editP: null, editE: null, editN: null, delN: null, delSes: null, rejecting: null, att: null, err: '' };
 try { TOKEN = sessionStorage.getItem('arrupe-token'); } catch (e) { }
 let CODE = null;
 try {
@@ -224,7 +224,8 @@ function demoApi(action, d) {
     case 'guardarInfoEntidad': D2.entidades.forEach(e => { if (e.id === d.entidad) Object.assign(e, { horario: d.horario, lugar: d.lugar, descripcion: d.descripcion || e.descripcion, whatsapp: d.whatsapp, editadoPor: short(me.nombre), editado: todayISO() }); }); return D2;
     case 'guardarMisDatos': Object.assign(me, d); return D2;
     case 'invitarVoluntarios': D2.coord[d.entidad].equipo.forEach(p => { if (d.emails.includes(p.email)) p.invitacion = 'enviada'; }); return D2;
-    case 'asignarInscripcion': D2.pastoral.inscripciones.forEach(i => { if (i.id === d.id) { i.estado = 'asignada'; i.entidades = d.entidades; i.entidad = d.entidades.join(','); } }); return D2;
+    case 'asignarInscripciones': d.items.forEach(x => D2.pastoral.inscripciones.forEach(i => { if (i.id === x.id) { i.estado = 'asignada'; i.entidades = x.entidades; i.entidad = x.entidades.join(','); i.avisado = ''; } })); return D2;
+    case 'enviarAgradecimiento': D2.pastoral.inscripciones.forEach(i => { if (d.ids.includes(i.id)) i.avisado = todayISO(); }); return D2;
     case 'estadoInscripcion': D2.pastoral.inscripciones.forEach(i => { if (i.id === d.id) i.estado = d.estado; }); return D2;
     case 'guardarPersona': { let p = D2.pastoral.personas.find(x => x.email === d.email); if (!p) { p = { email: d.email, alta: todayISO(), asignaciones: [], docs: { cert: { estado: 'pend', url: '' }, comp: { estado: 'pend', url: '' } }, horas: 0, telefono: '', emergencia: '', compromiso: null }; D2.pastoral.personas.push(p); }
       Object.assign(p, { nombre: d.nombre, curso: d.curso, rol: d.rol, estado: d.estado, coordEnts: d.coordEnts, asignaciones: d.asignaciones.map(e => ({ entidad: e, estado: 'activa' })) }); return D2; }
@@ -601,22 +602,43 @@ function vPanel() {
      <p class="small muted">La formación y la parte pastoral son las que más margen tienen este curso.</p></div>
   </div>`;
 }
+function insEnts(i) {
+  if (!S.insEnts[i.id]) S.insEnts[i.id] = new Set(i.preferencias.slice(0, 3));
+  return S.insEnts[i.id];
+}
 function vIns() {
   const all = D.pastoral.inscripciones;
   const F = [['nueva', 'Nuevas'], ['en_espera', 'En espera'], ['asignada', 'Asignadas'], ['descartada', 'Descartadas']];
   const list = all.filter(i => i.estado === S.insFilter);
-  return header('Servicio de Pastoral', 'Inscripciones', 'Llegan solas desde el formulario de Google y os avisamos por correo. Preselecciona y envía cada persona a la coordinación que mejor encaje.') +
-    `<div class="filters" role="group" aria-label="Filtrar inscripciones">${F.map(([k, l]) => `<button data-insf="${k}" aria-pressed="${S.insFilter === k}">${l} · ${all.filter(i => i.estado === k).length}</button>`).join('')}</div>
-    ${list.length ? `<div class="grid">${list.map(i => {
+  const sel = S.insSel[S.insFilter] || (S.insSel[S.insFilter] = new Set());
+  [...sel].forEach(id => { if (!list.some(i => i.id === id)) sel.delete(id); });
+  const preselect = S.insFilter === 'nueva' || S.insFilter === 'en_espera';
+  const asignadas = S.insFilter === 'asignada';
+  const n = sel.size;
+  const sinAvisar = asignadas ? list.filter(i => !i.avisado) : [];
+  const bar = !list.length ? '' : preselect
+    ? `<div class="card" style="gap:10px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:grid;gap:2px;min-width:0;flex:1 1 280px"><h2>Preselección</h2><span class="muted small">Marca en cada inscripción las entidades (hasta tres) y selecciona las que quieras preseleccionar. No se envía nada a la persona hasta que lo hagáis desde Asignadas.</span></div>
+      <div class="actions"><button class="btn ghost sm" data-act="ins-all">${n === list.length ? 'Quitar selección' : `Seleccionar todas (${list.length})`}</button>
+      <button class="btn primary" data-act="ins-pre" ${n ? '' : 'disabled'}>${ic('check', 18)}Preseleccionar${n ? ` (${n})` : ''}</button></div></div></div>`
+    : asignadas ? `<div class="card" style="gap:10px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:grid;gap:2px;min-width:0;flex:1 1 280px"><h2>Correo de agradecimiento</h2><span class="muted small">Agradece la inscripción, confirma la preselección y anuncia que la coordinación se pondrá en contacto en breve.</span></div>
+      <div class="actions">${sinAvisar.length ? `<button class="btn ghost sm" data-act="ins-sinavisar">Seleccionar las no avisadas (${sinAvisar.length})</button>` : ''}${n ? '<button class="btn ghost sm" data-act="ins-none">Quitar selección</button>' : ''}
+      <button class="btn primary" data-act="ins-thanks" ${n ? '' : 'disabled'}>${ic('mail', 18)}Enviar correo${n ? ` (${n})` : ''}</button></div></div>
+      ${S.thanksConfirm ? `<div class="confirm" style="background:var(--brand-soft)"><span>Vas a enviar ${n} ${n === 1 ? 'correo' : 'correos'}${[...sel].some(id => (list.find(i => i.id === id) || {}).avisado) ? ', y alguna persona ya lo había recibido' : ''}. ¿Seguimos?</span><button class="btn primary sm" data-act="ins-thanks-yes">Sí, enviar</button><button class="btn ghost sm" data-act="ins-thanks-no">Cancelar</button></div>` : ''}</div>`
+    : '';
+  return header('Servicio de Pastoral', 'Inscripciones', 'Llegan solas desde el formulario de Google y os avisamos por correo. Preseleccionad en bloque y, cuando queráis, enviad el correo de agradecimiento desde Asignadas.') +
+    `<div class="filters" role="group" aria-label="Filtrar inscripciones">${F.map(([k, l]) => `<button data-insf="${k}" aria-pressed="${S.insFilter === k}">${l} · ${all.filter(i => i.estado === k).length}</button>`).join('')}</div>` + bar +
+    (list.length ? `<div class="grid">${list.map(i => {
       const ie = (i.entidades && i.entidades.length) ? i.entidades : String(i.entidad || '').split(',').filter(Boolean);
-      const st = i.estado === 'asignada' ? `<span class="pill ok">Enviada a ${esc(ie.map(x => E(x).nombre).join(' y '))}</span>` : i.estado === 'nueva' ? '<span class="pill warn">Nueva</span>' : i.estado === 'en_espera' ? '<span class="pill info">En espera</span>' : '<span class="pill bad">Descartada</span>';
-      const assign = S.assigning === i.id ? `<div style="display:grid;gap:10px"><span style="font-weight:600;font-size:.88rem">Enviar a la coordinación de (puedes marcar más de una)</span>
-        <div class="checks">${D.entidades.filter(e => e.activa).map(e => `<label><input type="checkbox" data-asig="${esc(e.id)}" ${i.preferencias.includes(e.id) ? 'checked' : ''}>${esc(e.nombre)}${i.preferencias.includes(e.id) ? ' <span class="hint">· la eligió</span>' : ''} <span class="hint tnum">${e.ocupadas}/${e.cupo}</span></label>`).join('')}</div>
-        <div class="actions"><button class="btn primary" data-assign="${esc(i.id)}">${ic('arrow', 18)}Enviar</button><button class="btn ghost" data-act="cancel-assign">Cancelar</button></div></div>`
-        : (i.estado !== 'asignada' ? `<div class="actions"><button class="btn primary sm" data-pre="${esc(i.id)}">Preseleccionar</button>${i.estado !== 'en_espera' ? `<button class="btn ghost sm" data-insst="${esc(i.id)}|en_espera">Dejar en espera</button>` : ''}${i.estado !== 'descartada' ? `<button class="btn ghost sm" data-insst="${esc(i.id)}|descartada">Descartar</button>` : `<button class="btn ghost sm" data-insst="${esc(i.id)}|nueva">Recuperar</button>`}</div>` : '');
-      return `<div class="card"><div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap"><div class="av" style="background:var(--brand)">${esc(initials(i.nombre))}</div><div style="flex:1 1 220px;min-width:0;display:grid;gap:2px"><h3>${esc(i.nombre || '(sin nombre)')}</h3><span class="small muted">${esc(i.curso)} · ${esc(i.email || 'sin correo')} · ${fmt(i.fecha)}</span></div>${st}</div>
-        ${i.motivo ? `<p>“${esc(i.motivo)}”</p>` : ''}<div class="chips"><span class="small muted">Prefiere:</span>${i.preferencias.length ? i.preferencias.map(chip).join('') : `<span class="small">${esc(i.preferenciasTexto || '—')}</span>`}</div>${assign}</div>`;
-    }).join('')}</div>` : '<div class="empty">No hay inscripciones en este apartado.</div>'}`;
+      const st = i.estado === 'asignada' ? (i.avisado ? `<span class="pill ok">Correo enviado · ${fmt(i.avisado)}</span>` : '<span class="pill warn">Sin avisar</span>') : i.estado === 'nueva' ? '<span class="pill warn">Nueva</span>' : i.estado === 'en_espera' ? '<span class="pill info">En espera</span>' : '<span class="pill bad">Descartada</span>';
+      const chk = (preselect || asignadas) ? `<input type="checkbox" data-inssel="${esc(i.id)}" ${sel.has(i.id) ? 'checked' : ''} aria-label="Seleccionar a ${esc(i.nombre)}" style="width:22px;height:22px;accent-color:var(--brand);margin-top:8px;flex:none">` : '';
+      const es = preselect ? insEnts(i) : null;
+      const entsHtml = preselect ? `<div style="display:grid;gap:6px"><span class="small muted">Preseleccionar para${es.size ? '' : ' <b style="color:var(--warn)">(elige al menos una)</b>'}:</span><div class="checks">${D.entidades.filter(e => e.activa).map(e => `<label style="${es.has(e.id) ? 'border-color:' + cvar(e.color) + ';background:color-mix(in srgb,' + cvar(e.color) + ' 10%,transparent)' : ''}"><input type="checkbox" data-insent="${esc(i.id)}|${esc(e.id)}" ${es.has(e.id) ? 'checked' : ''}>${esc(e.nombre)}${i.preferencias.includes(e.id) ? ' <span class="hint">· la eligió</span>' : ''} <span class="hint tnum">${e.ocupadas}/${e.cupo}</span></label>`).join('')}</div></div>`
+        : asignadas ? `<div class="chips"><span class="small muted">Preseleccionada para:</span>${ie.map(chip).join('')}</div>`
+        : `<div class="chips"><span class="small muted">Prefiere:</span>${i.preferencias.length ? i.preferencias.map(chip).join('') : `<span class="small">${esc(i.preferenciasTexto || '—')}</span>`}</div>`;
+      const acciones = i.estado === 'asignada' ? '' : `<div class="actions">${i.estado !== 'en_espera' && i.estado !== 'descartada' ? `<button class="btn ghost sm" data-insst="${esc(i.id)}|en_espera">Dejar en espera</button>` : ''}${i.estado !== 'descartada' ? `<button class="btn ghost sm" data-insst="${esc(i.id)}|descartada">Descartar</button>` : `<button class="btn ghost sm" data-insst="${esc(i.id)}|nueva">Recuperar</button>`}</div>`;
+      return `<div class="card" style="${sel.has(i.id) ? 'border-color:var(--brand)' : ''}"><div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap">${chk}<div class="av" style="background:var(--brand)">${esc(initials(i.nombre))}</div><div style="flex:1 1 220px;min-width:0;display:grid;gap:2px"><h3>${esc(i.nombre || '(sin nombre)')}</h3><span class="small muted">${esc(i.curso)} · ${esc(i.email || 'sin correo')} · ${fmt(i.fecha)}</span></div>${st}</div>
+        ${i.motivo ? `<p>“${esc(i.motivo)}”</p>` : ''}${entsHtml}${acciones}</div>`;
+    }).join('')}</div>` : '<div class="empty">No hay inscripciones en este apartado.</div>');
 }
 function vPersonas() {
   const q = S.q.toLowerCase();
@@ -969,15 +991,7 @@ root.addEventListener('click', async ev => {
   if (d.demo) return startDemo(d.demo);
   if (d.go) return go(d.go);
   if (d.ent) { S.view = 'explorar'; S.ent = d.ent; S.leaving = null; render.keepScroll = false; return render(); }
-  if (d.insf) { S.insFilter = d.insf; S.assigning = null; return render(); }
-  if (d.pre) { S.assigning = d.pre; return render(); }
-  if (d.assign) {
-    const ents = [...root.querySelectorAll('[data-asig]:checked')].map(x => x.dataset.asig);
-    if (!ents.length) return toast('Marca al menos una entidad');
-    if (ents.length > 3) return toast('Como máximo tres entidades a la vez');
-    S.assigning = null;
-    return run('asignarInscripcion', { id: d.assign, entidades: ents }, `Enviada a ${ents.map(x => E(x).nombre).join(' y ')}. Le llega un correo a la persona y a cada coordinación.`);
-  }
+  if (d.insf) { S.insFilter = d.insf; S.thanksConfirm = false; return render(); }
   if (d.insst) { const [id, estado] = d.insst.split('|'); return run('estadoInscripcion', { id, estado }, 'Inscripción actualizada'); }
   if (d.approve) { const p = D.pastoral.personas.find(x => x.email === d.approve); return run('guardarPersona', { email: p.email, nombre: p.nombre, curso: p.curso, rol: p.rol, estado: 'activo', coordEnts: p.coordEnts, asignaciones: p.asignaciones.filter(a => a.estado === 'activa').map(a => a.entidad) }, 'Cuenta aprobada'); }
   if (d.req) { const [email, entidad, ok] = d.req.split('|'); return run('resolverSolicitud', { email, entidad, aceptar: ok === '1' }, ok === '1' ? 'Solicitud aceptada. Le llega un correo.' : 'Solicitud rechazada'); }
@@ -1100,7 +1114,27 @@ root.addEventListener('click', async ev => {
       if (r) { S.att.sel = new Set(); render(); }
       return;
     }
-    case 'cancel-assign': S.assigning = null; return render();
+    case 'ins-all': { const list = D.pastoral.inscripciones.filter(i => i.estado === S.insFilter), sel = S.insSel[S.insFilter]; if (sel.size === list.length) sel.clear(); else list.forEach(i => sel.add(i.id)); return render(); }
+    case 'ins-none': S.insSel[S.insFilter].clear(); S.thanksConfirm = false; return render();
+    case 'ins-sinavisar': D.pastoral.inscripciones.filter(i => i.estado === 'asignada' && !i.avisado).forEach(i => S.insSel.asignada.add(i.id)); return render();
+    case 'ins-pre': {
+      const sel = [...S.insSel[S.insFilter]];
+      const items = sel.map(id => ({ id, entidades: [...(S.insEnts[id] || [])] }));
+      const sinEnt = items.filter(x => !x.entidades.length).length;
+      if (sinEnt) return toast(sinEnt === 1 ? 'Hay una inscripción seleccionada sin entidad' : `Hay ${sinEnt} inscripciones seleccionadas sin entidad`);
+      if (items.some(x => x.entidades.length > 3)) return toast('Como máximo tres entidades por persona');
+      const r = await run('asignarInscripciones', { items }, `${items.length} ${items.length === 1 ? 'persona preseleccionada' : 'personas preseleccionadas'}. Envía el correo de agradecimiento desde Asignadas cuando quieras.`);
+      if (r) { S.insSel[S.insFilter].clear(); render(); }
+      return;
+    }
+    case 'ins-thanks': S.thanksConfirm = true; return render();
+    case 'ins-thanks-no': S.thanksConfirm = false; return render();
+    case 'ins-thanks-yes': {
+      const ids = [...S.insSel.asignada]; S.thanksConfirm = false;
+      const r = await run('enviarAgradecimiento', { ids }, `${ids.length} ${ids.length === 1 ? 'correo enviado' : 'correos enviados'}`);
+      if (r) { S.insSel.asignada.clear(); render(); }
+      return;
+    }
     case 'cancel-deln': S.delN = null; return render();
     case 'cancel-delses': S.delSes = null; return render();
     case 'close-editp': S.editP = null; return render();
@@ -1143,6 +1177,8 @@ root.addEventListener('change', ev => {
     rd.onerror = () => toast('No se pudo leer el archivo');
     rd.readAsDataURL(f);
   }
+  if (t.dataset.inssel) { const sel = S.insSel[S.insFilter]; t.checked ? sel.add(t.dataset.inssel) : sel.delete(t.dataset.inssel); S.thanksConfirm = false; render(); return; }
+  if (t.dataset.insent) { const [id, ent] = t.dataset.insent.split('|'); const set = S.insEnts[id] || (S.insEnts[id] = new Set()); if (t.checked) { if (set.size >= 3) { t.checked = false; return toast('Como máximo tres entidades por persona'); } set.add(ent); S.insSel[S.insFilter] && S.insSel[S.insFilter].add(id); } else set.delete(ent); render(); return; }
   if (t.dataset.isel) { t.checked ? S.isel.set.add(t.dataset.isel) : S.isel.set.delete(t.dataset.isel); render(); return; }
   if (t.dataset.att) { t.checked ? S.att.sel.add(t.dataset.att) : S.att.sel.delete(t.dataset.att); }
   if (t.id === 'attDate') { S.att.date = t.value; render(); }

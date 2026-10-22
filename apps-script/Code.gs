@@ -40,7 +40,7 @@ const HOJAS = {
   Usuarios: ['email', 'nombre', 'rol', 'estado', 'curso', 'coordEnts', 'alta', 'telefono', 'emailContacto', 'emergenciaNombre', 'emergenciaTelefono', 'avisos', 'ultimoAcceso'],
   Entidades: ['id', 'nombre', 'lugar', 'etiqueta', 'color', 'descripcion', 'horario', 'cupo', 'ig', 'activa', 'claves', 'whatsapp', 'editadoPor', 'editado'],
   Asignaciones: ['email', 'entidad', 'estado', 'fecha', 'origen'],
-  Inscripciones: ['id', 'fecha', 'nombre', 'email', 'curso', 'preferencias', 'preferenciasTexto', 'motivo', 'estado', 'entidad', 'gestionadoPor'],
+  Inscripciones: ['id', 'fecha', 'nombre', 'email', 'curso', 'preferencias', 'preferenciasTexto', 'motivo', 'estado', 'entidad', 'gestionadoPor', 'avisado'],
   Documentos: ['email', 'tipo', 'estado', 'fileId', 'archivo', 'fecha', 'revisadoPor', 'fechaRevision', 'nota'],
   Asistencia: ['sesion', 'fecha', 'entidad', 'email', 'horas', 'registradoPor', 'creado'],
   Noticias: ['id', 'fecha', 'titulo', 'detalle', 'tipo', 'autor'],
@@ -371,22 +371,50 @@ const ACCIONES = {
   },
 
   // ── pastoral ──
-  asignarInscripcion: (me, d) => {
+  // Preselección: asigna sin escribir a la persona. El correo de agradecimiento se envía después, desde Asignadas.
+  asignarInscripcion: (me, d) => ACCIONES.asignarInscripciones(me, { items: [{ id: d.id, entidades: d.entidades && d.entidades.length ? d.entidades : [d.entidad] }] }),
+  asignarInscripciones: (me, d) => {
     pastoral_(me);
-    const ids = [...new Set((d.entidades && d.entidades.length ? d.entidades : [d.entidad]).filter(Boolean))];
-    if (!ids.length) throw httpErr_('Elige al menos una entidad');
-    if (ids.length > 3) throw httpErr_('Como máximo tres entidades a la vez');
-    const ents = ids.map(entidad_);
-    const ins = rows_('Inscripciones').find(r => String(r.id) === String(d.id));
-    if (!ins) throw httpErr_('Inscripción no encontrada');
-    if (!ins.email) throw httpErr_('Esta inscripción no tiene correo. Añádelo en la hoja Inscripciones.');
-    withLock_(() => {
-      updateWhere_('Inscripciones', r => String(r.id) === String(d.id), { estado: 'asignada', entidad: ids.join(','), gestionadoPor: me.email });
-      upsertUser_(ins.email, { nombre: ins.nombre, curso: ins.curso, estado: 'activo' });
-      ids.forEach(id => asignar_(ins.email, id, 'inscripción'));
+    const items = (d.items || []).map(x => ({ id: String(x.id), entidades: [...new Set((x.entidades || []).filter(Boolean))] }));
+    if (!items.length) throw httpErr_('Selecciona al menos una inscripción');
+    if (items.length > 80) throw httpErr_('Como máximo 80 inscripciones de una vez');
+    const todas = rows_('Inscripciones');
+    items.forEach(x => {
+      const ins = todas.find(r => String(r.id) === x.id);
+      if (!ins) throw httpErr_('Hay una inscripción que ya no existe. Recarga la página.');
+      if (!ins.email) throw httpErr_('La inscripción de ' + (ins.nombre || 'una persona') + ' no tiene correo. Añádelo en la hoja Inscripciones.');
+      if (!x.entidades.length) throw httpErr_('Elige al menos una entidad para ' + ins.nombre);
+      if (x.entidades.length > 3) throw httpErr_('Como máximo tres entidades para ' + ins.nombre);
+      x.entidades.forEach(entidad_);
+      x.ins = ins;
     });
-    ents.forEach(ent => avisarAsignacion_(ins.email, ins.nombre, ent));
-    log_(me, 'asignarInscripcion', ins.email + ' → ' + ids.join(','));
+    const porEntidad = {};
+    withLock_(() => items.forEach(x => {
+      updateWhere_('Inscripciones', r => String(r.id) === x.id, { estado: 'asignada', entidad: x.entidades.join(','), gestionadoPor: me.email });
+      upsertUser_(x.ins.email, { nombre: x.ins.nombre, curso: x.ins.curso, estado: 'activo' });
+      x.entidades.forEach(id => { asignar_(x.ins.email, id, 'inscripción'); (porEntidad[id] = porEntidad[id] || []).push(x.ins); });
+    }));
+    // Un solo aviso por entidad a su coordinación, con la lista de la tanda
+    Object.keys(porEntidad).forEach(id => {
+      const ent = entidad_(id), coords = coordinadores_(id).map(u => u.email);
+      if (!coords.length) return;
+      const lista = porEntidad[id].map(i => `<li><b>${esc_(i.nombre)}</b> · ${esc_(i.curso || '')} · ${esc_(i.email)}</li>`).join('');
+      mail_(coords, (porEntidad[id].length === 1 ? 'Nueva incorporación' : porEntidad[id].length + ' nuevas incorporaciones') + ' en ' + ent.nombre,
+        `<p>Pastoral ha preseleccionado para <b>${esc_(ent.nombre)}</b> a:</p><ul>${lista}</ul><p>En breve recibirán un correo de agradecimiento anunciando que os pondréis en contacto con ellos. Desde la app podréis escribirles una bienvenida personal e invitarlos.</p>`,
+        'Ver mi equipo', 'cinicio');
+    });
+    log_(me, 'asignarInscripciones', items.length + ' inscripciones');
+    return bootstrap_(me);
+  },
+  enviarAgradecimiento: (me, d) => {
+    pastoral_(me);
+    const ids = new Set((d.ids || []).map(String));
+    const lista = rows_('Inscripciones').filter(r => ids.has(String(r.id)) && r.estado === 'asignada' && r.email);
+    if (!lista.length) throw httpErr_('Selecciona al menos una inscripción asignada');
+    if (lista.length > 80) throw httpErr_('Como máximo 80 correos de una vez');
+    lista.forEach(ins => mailAgradecimiento_(ins, me));
+    withLock_(() => lista.forEach(ins => updateWhere_('Inscripciones', r => String(r.id) === String(ins.id), { avisado: new Date() })));
+    log_(me, 'enviarAgradecimiento', lista.length + ' correos');
     return bootstrap_(me);
   },
   estadoInscripcion: (me, d) => {
@@ -780,7 +808,7 @@ function bootstrap_(me) {
       })),
       inscripciones: rows_('Inscripciones').map(r => ({
         id: String(r.id), fecha: iso_(r.fecha), nombre: r.nombre, email: r.email, curso: r.curso,
-        preferencias: splitList_(r.preferencias), preferenciasTexto: r.preferenciasTexto, motivo: r.motivo, estado: r.estado, entidad: r.entidad, entidades: splitList_(r.entidad)
+        preferencias: splitList_(r.preferencias), preferenciasTexto: r.preferenciasTexto, motivo: r.motivo, estado: r.estado, entidad: r.entidad, entidades: splitList_(r.entidad), avisado: iso_(r.avisado)
       })).reverse(),
       sesiones: sesiones_(asis, byEmail).slice(0, 40),
       invitaciones: rows_('Invitaciones').map(r => ({
@@ -1088,6 +1116,20 @@ function mailInvitacionVol_(inv, me) {
      </ol>
      <p>Si tienes cualquier duda, responde a este correo.</p>`,
     'Entrar en la app', '', me.email, url);
+}
+
+function mailAgradecimiento_(ins, me) {
+  const ents = splitList_(ins.entidad).map(id => { try { return entidad_(id); } catch (e) { return null; } }).filter(Boolean);
+  const lista = ents.map(e => `<li><b>${esc_(e.nombre)}</b> · ${esc_(e.lugar)}<br><span style="color:#4A5C6E;font-size:14px">${esc_(e.horario)}</span></li>`).join('');
+  const varias = ents.length > 1;
+  mail_([ins.email], 'Gracias por inscribirte en el Voluntariado Arrupe',
+    `<p>Hola, ${esc_(String(ins.nombre || '').split(' ')[0])}:</p>
+     <p>Gracias por inscribirte en el Voluntariado Arrupe. Que hayas dado este paso ya dice mucho de ti.</p>
+     <p>Te hemos preseleccionado para ${varias ? 'estos voluntariados' : 'este voluntariado'}:</p><ul style="padding-left:20px">${lista}</ul>
+     <p>En los próximos días <b>${varias ? 'las personas que coordinan cada voluntariado' : 'la persona que coordina este voluntariado'} se pondrá${varias ? 'n' : ''} en contacto contigo</b> para darte la bienvenida y contarte cómo empezar.</p>
+     <p>Mientras tanto, puedes entrar en la app con esta cuenta de Google para ir completando tu documentación: el certificado de delitos de naturaleza sexual y el compromiso de voluntariado.</p>
+     <p style="margin-bottom:0">Un abrazo,<br>${esc_(me.nombre)}<br><span style="color:#6E8193;font-size:13px">Servicio de Pastoral</span></p>`,
+    'Entrar en la app', 'docs', me.email);
 }
 
 // ───────────────────────── AYUDANTES ─────────────────────────
