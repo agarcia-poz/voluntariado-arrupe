@@ -41,7 +41,7 @@ const $ = id => document.getElementById(id);
 const COLORS = ['orange', 'magenta', 'purple', 'brown', 'blue', 'red', 'grey', 'green', 'teal'];
 const cvar = c => `var(--e-${COLORS.includes(c) ? c : 'blue'})`;
 const IG = 'https://www.instagram.com/unisafa/';
-const VERSION_API = '2026-10-22b'; // debe coincidir con la de Code.gs
+const VERSION_API = '2026-10-22c'; // debe coincidir con la de Code.gs
 
 /* ───────── estado ───────── */
 let TOKEN = null, D = null;
@@ -135,6 +135,13 @@ function demoPastoral(base) {
         { codigo: 'KGS-DVK', email: 'clara.ortega@cusafa.es', nombre: 'Clara Ortega', entidades: ['hogar'], estado: 'usada', creado: dIso(-1), usadoPor: 'clara.ortega@cusafa.es', usadoEn: dIso(0) },
         { codigo: '95V-K53', email: 'pablo.ruiz@cusafa.es', nombre: 'Pablo Ruiz', entidades: ['res'], estado: 'usada', creado: dIso(-1), usadoPor: 'pablo.personal@gmail.com', usadoEn: dIso(0) },
         { codigo: 'P9A-H45', email: 'ana.sanchez@cusafa.es', nombre: 'Ana Sánchez', entidades: ['down'], estado: 'enviada', creado: dIso(-1), usadoPor: '', usadoEn: '' }
+      ],
+      notificaciones: [
+        { id: 'a1', fecha: new Date(Date.now() - 12 * 60000).toISOString(), tipo: 'inscripcion', titulo: 'Nueva inscripción: Nerea Castro Vela', detalle: '1.º Ed. Infantil · Prefiere: Escuela Hogar, Apoyo escolar', vista: 'ins', leida: false },
+        { id: 'a2', fecha: new Date(Date.now() - 95 * 60000).toISOString(), tipo: 'documento', titulo: 'Documento por revisar: Javier Cuesta Ruiz', detalle: 'Certificado de delitos de naturaleza sexual', vista: 'personas', leida: false },
+        { id: 'a3', fecha: new Date(Date.now() - 5 * 3600000).toISOString(), tipo: 'solicitud', titulo: 'Daniel Moya Peña quiere servir en Asociación Síndrome de Down', detalle: 'Solicitud desde la app', vista: 'panel', leida: false },
+        { id: 'a4', fecha: new Date(Date.now() - 26 * 3600000).toISOString(), tipo: 'cuenta', titulo: 'Cuenta pendiente de aprobar: Paula Rentero Gil', detalle: 'paula.rentero@gmail.com', vista: 'panel', leida: false },
+        { id: 'a5', fecha: new Date(Date.now() - 50 * 3600000).toISOString(), tipo: 'baja', titulo: 'Irene Sola ha dejado Residencia de Ancianos', detalle: 'Baja desde la app', vista: 'personas', leida: true }
       ],
       sesiones: [], hojaUrl: '', carpetaUrl: '', multimediaUrl: ''
     }
@@ -234,6 +241,7 @@ function demoApi(action, d) {
     case 'resolverSolicitud': D2.pastoral.personas.forEach(p => { if (p.email === d.email) p.asignaciones = p.asignaciones.map(a => a.entidad === d.entidad && a.estado === 'solicitada' ? (d.aceptar ? { entidad: a.entidad, estado: 'activa' } : null) : a).filter(Boolean); }); return D2;
     case 'crearInvitaciones': d.lista.forEach(x => D2.pastoral.invitaciones.unshift({ codigo: Math.random().toString(36).slice(2, 5).toUpperCase() + '-' + Math.random().toString(36).slice(2, 5).toUpperCase(), email: x.email, nombre: x.nombre, entidades: x.entidades, estado: 'enviada', creado: todayISO(), usadoPor: '', usadoEn: '' })); return D2;
     case 'reenviarInvitacion': return D2;
+    case 'marcarNotificaciones': D2.pastoral.notificaciones.forEach(n => { if (d.todas || (d.ids || []).includes(n.id)) n.leida = true; }); return D2;
     case 'anularInvitacion': D2.pastoral.invitaciones.forEach(i => { if (i.codigo === d.codigo) i.estado = 'anulada'; }); return D2;
     case 'guardarEntidad': { const e = D2.entidades.find(x => x.id === d.id); if (e) Object.assign(e, d, { cupo: Number(d.cupo) || 0 }); else D2.entidades.push(Object.assign({ coordinadores: [], ocupadas: 0 }, d, { cupo: Number(d.cupo) || 0 })); return D2; }
     case 'guardarNoticia': if (d.id) D2.noticias.forEach(n => { if (n.id === d.id) Object.assign(n, d); }); else D2.noticias.push(Object.assign({}, d, { id: 'n' + Date.now() })); D2.noticias.sort((x, y) => x.fecha < y.fecha ? -1 : 1); return D2;
@@ -335,18 +343,19 @@ function nav() {
   const c = caps();
   if (c.pend) return [['espera', 'Tu cuenta', 'home'], ['datos', 'Mis datos', 'user'], ['explorar', 'Dónde servir', 'compass'], ['noticias', 'Noticias', 'bell']];
   const n = [];
-  if (c.isP) n.push(['panel', 'Panel', 'chart'], ['ins', 'Inscripciones', 'inbox'], ['personas', 'Personas', 'users'], ['invitaciones', 'Invitaciones', 'mail'], ['entidades', 'Entidades', 'building']);
+  if (c.isP) n.push(['panel', 'Panel', 'chart'], ['avisos', 'Avisos', 'bell'], ['ins', 'Inscripciones', 'inbox'], ['personas', 'Personas', 'users'], ['invitaciones', 'Invitaciones', 'mail'], ['entidades', 'Entidades', 'building']);
   if (c.isC) n.push(['cinicio', 'Mi entidad', 'building'], ['equipo', 'Equipo', 'users'], ['chorario', 'Horarios', 'calendar'], ['asistencia', 'Asistencia', 'check']);
   if (c.isVol) n.push(['vinicio', 'Mi voluntariado', 'home'], ['horario', 'Mi horario', 'calendar'], ['docs', 'Documentos', 'file'], ['horas', 'Mis horas', 'clock']);
   if (c.isVol || c.isC) n.push(['fotos', 'Fotos y vídeos', 'camera']);
   if (!c.isP) n.push(['datos', 'Mis datos', 'user']);
-  n.push(['explorar', 'Dónde servir', 'compass'], ['noticias', 'Noticias', 'bell']);
+  n.push(['explorar', 'Dónde servir', 'compass'], ['noticias', 'Noticias', 'calendar']);
   return n;
 }
 function badge(k) {
   if (!D.pastoral) return 0;
   if (k === 'ins') return D.pastoral.inscripciones.filter(i => i.estado === 'nueva').length;
   if (k === 'panel') return pendientesPastoral().total;
+  if (k === 'avisos') return (D.pastoral.notificaciones || []).filter(n => !n.leida).length;
   return 0;
 }
 function pendientesPastoral() {
@@ -586,6 +595,23 @@ function avisoVersion() {
   if (DEMO || !D || !caps().isP || D.version === VERSION_API) return '';
   return `<div class="note" style="background:var(--warn-soft)">${ic('shield', 18)}<span><b>El script de Google está desactualizado.</b> Algunas funciones nuevas no responderán hasta que copies <b>apps-script/Code.gs</b> del repositorio en script.google.com y publiques una versión nueva (Implementar → Gestionar implementaciones → lápiz → Nueva versión).</span></div>`;
 }
+const TIPO_AVISO = { inscripcion: ['info', 'Inscripción'], solicitud: ['info', 'Solicitud'], documento: ['warn', 'Documento'], cuenta: ['warn', 'Cuenta nueva'], baja: ['bad', 'Baja'], ausencia: ['bad', 'Ausencia'] };
+function haceTxt(iso) {
+  const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+  if (!(m >= 0)) return '';
+  if (m < 1) return 'ahora'; if (m < 60) return 'hace ' + m + ' min'; const h = Math.round(m / 60); if (h < 24) return 'hace ' + h + ' h';
+  const d = Math.round(h / 24); return d === 1 ? 'ayer' : 'hace ' + d + ' días';
+}
+function avisoRow(n) {
+  const t = TIPO_AVISO[n.tipo] || ['info', 'Aviso'];
+  return `<div class="row" style="${n.leida ? 'opacity:.7' : ''}">${n.leida ? '' : '<span aria-label="Sin leer" style="width:9px;height:9px;border-radius:50%;background:var(--brand);flex:none"></span>'}<span class="pill ${t[0]}">${t[1]}</span><div class="grow"><b>${esc(n.titulo)}</b><span class="muted small">${esc(n.detalle)}${n.detalle ? ' · ' : ''}${haceTxt(n.fecha)}</span></div><button class="btn ghost sm" data-aviso="${esc(n.id)}|${esc(n.vista || 'panel')}">Ver</button></div>`;
+}
+function vAvisos() {
+  const L = D.pastoral.notificaciones || [], sin = L.filter(n => !n.leida), leidas = L.filter(n => n.leida);
+  return header('Servicio de Pastoral', 'Avisos', `Lo que pasa en el voluntariado, sin llenar vuestro correo. Si se acumulan ${sin.length ? '' : 'varios '}avisos sin leer, os llegará un correo de resumen.`, sin.length ? `<button class="btn ghost" data-act="avisos-leidos">${ic('check', 18)}Marcar todos como leídos</button>` : '') +
+    `<div class="card"><h2>Sin leer${sin.length ? ` · ${sin.length}` : ''}</h2>${sin.length ? `<div class="list">${sin.map(avisoRow).join('')}</div>` : '<div class="empty">Estáis al día.</div>'}</div>
+    ${leidas.length ? `<details class="card"><summary style="cursor:pointer;font-weight:600">Leídos recientemente (${leidas.length})</summary><div class="list">${leidas.map(avisoRow).join('')}</div></details>` : ''}`;
+}
 function vPanel() {
   const P = D.pastoral.personas, act = P.filter(p => p.estado === 'activo' && p.asignaciones.some(a => a.estado === 'activa'));
   const inc = act.filter(p => p.docs.cert.estado !== 'ok' || p.docs.comp.estado !== 'ok').length;
@@ -597,6 +623,7 @@ function vPanel() {
    <div class="kpi"><b class="tnum">${act.length}</b><span>personas sirviendo · ${multi} en varias</span></div>
    <div class="kpi ${inc ? 'alert' : ''}"><b class="tnum">${inc}</b><span>con documentación incompleta</span></div>
    <div class="kpi"><b class="tnum">${nf(sum(P, p => p.horas))} h</b><span>de servicio registradas</span></div></div>
+  ${(() => { const sin = (D.pastoral.notificaciones || []).filter(n => !n.leida); return sin.length ? `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h2>Avisos sin leer · ${sin.length}</h2><button class="btn ghost sm" data-go="avisos">Ver todos</button></div><div class="list">${sin.slice(0, 4).map(avisoRow).join('')}</div></div>` : ''; })()}
   <div class="card"><h2>Pendiente de vosotros</h2>
     ${pp.total ? `<div class="list">
       ${pp.cuentas.map(p => `<div class="row"><span class="pill warn">Cuenta nueva</span><div class="grow"><b>${esc(p.nombre)}</b><span class="small muted">${esc(p.email)}</span></div><button class="btn primary sm" data-approve="${esc(p.email)}">Aprobar</button><button class="btn ghost sm" data-editp="${esc(p.email)}">Revisar</button></div>`).join('')}
@@ -997,7 +1024,7 @@ async function uploadMedia(files) {
 }
 
 /* ───────── render ───────── */
-const VIEWS = { horario: vHorario, chorario: vChorario, compromiso: vCompromiso, datos: vDatos, fotos: vFotos, espera: vEspera, explorar: vExplorar, vinicio: vVinicio, docs: vDocs, horas: vHoras, cinicio: vCinicio, equipo: vEquipo, asistencia: vAsistencia, panel: vPanel, ins: vIns, personas: vPersonas, invitaciones: vInvitaciones, entidades: vEntidades, noticias: vNoticias };
+const VIEWS = { avisos: vAvisos, horario: vHorario, chorario: vChorario, compromiso: vCompromiso, datos: vDatos, fotos: vFotos, espera: vEspera, explorar: vExplorar, vinicio: vVinicio, docs: vDocs, horas: vHoras, cinicio: vCinicio, equipo: vEquipo, asistencia: vAsistencia, panel: vPanel, ins: vIns, personas: vPersonas, invitaciones: vInvitaciones, entidades: vEntidades, noticias: vNoticias };
 function render() {
   const root = $('root');
   if (!D) {
@@ -1048,6 +1075,12 @@ root.addEventListener('click', async ev => {
   if (d.reinv) return run('reenviarInvitacion', { codigo: d.reinv }, 'Invitación reenviada');
   if (d.askanul) { S.anul = d.askanul; return render(); }
   if (d.anul) { S.anul = null; return run('anularInvitacion', { codigo: d.anul }, 'Invitación anulada'); }
+  if (d.aviso) {
+    const [id, vista] = d.aviso.split('|');
+    const n = (D.pastoral.notificaciones || []).find(x => x.id === id);
+    if (n && !n.leida) { n.leida = true; api('marcarNotificaciones', { ids: [id] }).then(r => { if (r && r.me && !DEMO) D = r; }).catch(() => { }); }
+    return go(VIEWS[vista] ? vista : 'panel');
+  }
   if (d.conf) { const [turno, fecha, respuesta] = d.conf.split('|'); return run('confirmarAsistencia', { turno, fecha, respuesta }, respuesta === 'sí' ? '¡Gracias! Asistencia confirmada' : 'Hemos avisado a tu coordinación'); }
   if (d.tftipo) { S.tf = Object.assign(S.tf || {}, readTf(), { tipo: d.tftipo }); return render(); }
   if (d.askdelt) { S.delT = d.askdelt; return render(); }
@@ -1069,6 +1102,7 @@ root.addEventListener('click', async ev => {
     case 'inv-parse': { S.invText = $('invText').value; S.inv = parseInv(S.invText); return render(); }
     case 'inv-back': S.inv = null; return render();
     case 'cancel-delt': S.delT = null; return render();
+    case 'avisos-leidos': return run('marcarNotificaciones', { todas: true }, 'Todos los avisos marcados como leídos');
     case 'w-cancel': S.welcome = null; return render();
     case 'w-ejemplo': {
       const e = E(S.cent), yo = D.me.nombre.split(' ')[0];
@@ -1241,7 +1275,7 @@ root.addEventListener('input', ev => {
 window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (D && VIEWS[h] && h !== S.view) go(h); });
 
 setInterval(async () => {
-  if (!D || DEMO || !TOKEN || document.hidden || !['ins', 'panel', 'personas', 'invitaciones'].includes(S.view) || !$('busy').hidden) return;
+  if (!D || DEMO || !TOKEN || document.hidden || !['ins', 'panel', 'personas', 'invitaciones', 'avisos'].includes(S.view) || !$('busy').hidden) return;
   const a = document.activeElement; if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
   try { const r = await api('bootstrap'); if (r && r.me && !DEMO) { D = r; render(); } } catch (e) { }
 }, 30000);

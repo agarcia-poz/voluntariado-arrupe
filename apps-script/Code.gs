@@ -32,11 +32,14 @@ const CONFIG = {
   // Correo del equipo de Pastoral. Si lo rellenas, los correos salen desde esa dirección y las respuestas
   // llegan ahí, en vez de a la cuenta personal que ejecuta el script. Debe estar configurada en Gmail como
   // dirección "Enviar como" de esta cuenta (Gmail → Configuración → Cuentas → Enviar como). Si no, déjalo vacío.
-  CORREO_EQUIPO: ''
+  CORREO_EQUIPO: '',
+  // Los avisos para Pastoral se ven como notificaciones en la app. Llega un correo de resumen cuando
+  // se acumulan estas notificaciones sin leer, y cada mañana si alguna lleva más de un día sin leer.
+  AVISO_ACUMULADAS: 5
 };
 
 // Versión del script. La web la compara con la suya para avisar si hay que actualizar Code.gs.
-const VERSION_API = '2026-10-22b';
+const VERSION_API = '2026-10-22c';
 
 const TIPOS_DOC = {
   cert: 'Certificado de delitos de naturaleza sexual',
@@ -59,6 +62,7 @@ const HOJAS = {
   Confirmaciones: ['turno', 'fecha', 'email', 'respuesta', 'cuando'],
   Recordatorios: ['turno', 'fecha', 'email', 'enviado'],
   Multimedia: ['fileId', 'entidad', 'email', 'nombre', 'mime', 'fecha', 'descripcion', 'estado'],
+  Notificaciones: ['id', 'fecha', 'tipo', 'titulo', 'detalle', 'vista', 'leidaPor', 'resumidaPara'],
   Invitaciones: ['codigo', 'email', 'nombre', 'rol', 'entidades', 'estado', 'creado', 'creadoPor', 'usadoPor', 'usadoEn']
 };
 
@@ -182,10 +186,7 @@ function guardarInscripcion_(resp, avisar) {
   };
   withLock_(() => append_('Inscripciones', ins));
   if (avisar) {
-    mail_(CONFIG.PASTORAL, 'Nueva inscripción: ' + ins.nombre,
-      `<p><b>${esc_(ins.nombre)}</b> (${esc_(ins.curso)}) se ha inscrito en el Voluntariado Arrupe.</p>
-       <p>Preferencias: ${esc_(prefTxt || '—')}</p><p>“${esc_(ins.motivo)}”</p>`,
-      'Ver inscripciones', 'ins');
+    notificar_('inscripcion', 'Nueva inscripción: ' + ins.nombre, (ins.curso ? ins.curso + ' · ' : '') + 'Prefiere: ' + (prefTxt || '—'), 'ins');
   }
 }
 
@@ -233,7 +234,7 @@ const ACCIONES = {
       if (a) throw httpErr_('Ya tienes una solicitud o asignación en esta entidad');
       append_('Asignaciones', { email: me.email, entidad: ent.id, estado: 'solicitada', fecha: new Date(), origen: 'app' });
     });
-    mail_(CONFIG.PASTORAL, 'Solicitud para ' + ent.nombre, `<p><b>${esc_(me.nombre)}</b> quiere servir en <b>${esc_(ent.nombre)}</b>.</p>`, 'Revisar solicitudes', 'panel');
+    notificar_('solicitud', me.nombre + ' quiere servir en ' + ent.nombre, 'Solicitud desde la app', 'panel');
     log_(me, 'solicitarEntidad', ent.id);
     return bootstrap_(me);
   },
@@ -241,7 +242,8 @@ const ACCIONES = {
     const ent = entidad_(d.entidad);
     withLock_(() => updateWhere_('Asignaciones', r => r.email === me.email && r.entidad === ent.id && r.estado !== 'baja', { estado: 'baja', fecha: new Date() }));
     const coords = coordinadores_(ent.id).map(u => u.email);
-    mail_(coords.concat(CONFIG.PASTORAL), 'Baja en ' + ent.nombre, `<p><b>${esc_(me.nombre)}</b> ha dejado el voluntariado de <b>${esc_(ent.nombre)}</b> desde la app.</p>`);
+    if (coords.length) mail_(coords, 'Baja en ' + ent.nombre, `<p><b>${esc_(me.nombre)}</b> ha dejado el voluntariado de <b>${esc_(ent.nombre)}</b> desde la app.</p>`);
+    notificar_('baja', me.nombre + ' ha dejado ' + ent.nombre, 'Baja desde la app', 'personas');
     log_(me, 'dejarEntidad', ent.id);
     return bootstrap_(me);
   },
@@ -265,7 +267,7 @@ const ACCIONES = {
       if (prev) updateWhere_('Documentos', r => r.email === me.email && r.tipo === d.tipo, rec);
       else append_('Documentos', rec);
     });
-    mail_(CONFIG.PASTORAL, 'Documento por revisar: ' + me.nombre, `<p><b>${esc_(me.nombre)}</b> ha subido: ${TIPOS_DOC[d.tipo]}.</p>`, 'Revisar', 'personas');
+    notificar_('documento', 'Documento por revisar: ' + me.nombre, TIPOS_DOC[d.tipo], 'personas');
     log_(me, 'subirDocumento', d.tipo);
     return bootstrap_(me);
   },
@@ -707,6 +709,21 @@ const ACCIONES = {
     return ACCIONES.galeria(me, { entidad: m.entidad });
   },
 
+  marcarNotificaciones: (me, d) => {
+    pastoral_(me);
+    const ids = d.todas ? null : new Set((d.ids || []).map(String));
+    withLock_(() => {
+      const sh = sheet_('Notificaciones'), vals = sh.getDataRange().getValues(), head = vals[0];
+      const iId = head.indexOf('id'), iL = head.indexOf('leidaPor');
+      for (let r = 1; r < vals.length; r++) {
+        if (ids && !ids.has(String(vals[r][iId]))) continue;
+        const l = splitList_(vals[r][iL]);
+        if (l.indexOf(me.email) < 0) { l.push(me.email); sh.getRange(r + 1, iL + 1).setValue(l.join(',')); }
+      }
+      delete _cache.Notificaciones;
+    });
+    return bootstrap_(me);
+  },
   borrarNoticia: (me, d) => {
     pastoral_(me);
     withLock_(() => deleteWhere_('Noticias', n => String(n.id) === String(d.id)));
@@ -831,6 +848,7 @@ function bootstrap_(me) {
         codigo: String(r.codigo), email: r.email, nombre: r.nombre, rol: r.rol || 'coord', entidades: splitList_(r.entidades), estado: r.estado,
         creado: iso_(r.creado), usadoPor: r.usadoPor, usadoEn: iso_(r.usadoEn)
       })).reverse(),
+      notificaciones: rows_('Notificaciones').slice(-60).reverse().map(n => ({ id: String(n.id), fecha: n.fecha instanceof Date ? n.fecha.toISOString() : String(n.fecha), tipo: n.tipo, titulo: n.titulo, detalle: n.detalle, vista: n.vista, leida: splitList_(n.leidaPor).indexOf(me.email) >= 0 })),
       hojaUrl: SpreadsheetApp.openById(prop_('SHEET_ID')).getUrl(),
       multimediaUrl: carpetaMediaRaiz_().getUrl(),
       carpetaUrl: DriveApp.getFolderById(prop_('FOLDER_ID')).getUrl()
@@ -881,8 +899,7 @@ function currentUser_(who) {
     u = { email: who.email, nombre: who.nombre, rol: esPastoral ? 'pastoral' : 'vol', estado: esPastoral ? 'activo' : 'pendiente', curso: '', coordEnts: '', alta: new Date() };
     withLock_(() => { if (!findUser_(who.email)) append_('Usuarios', u); });
     if (!esPastoral) {
-      mail_(CONFIG.PASTORAL, 'Cuenta pendiente de aprobar: ' + who.nombre,
-        `<p><b>${esc_(who.nombre)}</b> (${esc_(who.email)}) ha entrado por primera vez en la app y espera aprobación.</p>`, 'Revisar', 'panel');
+      notificar_('cuenta', 'Cuenta pendiente de aprobar: ' + who.nombre, who.email, 'panel');
     }
   } else if (esPastoral && (u.rol !== 'pastoral' || u.estado !== 'activo')) {
     withLock_(() => updateWhere_('Usuarios', r => r.email === who.email, { rol: 'pastoral', estado: 'activo' }));
@@ -932,7 +949,8 @@ function guardarConfirmacion_(t, fecha, email, resp) {
 function avisoAusencia_(t, fecha, u) {
   const ent = entidad_(t.entidad);
   const coords = coordinadores_(ent.id).map(c => c.email);
-  mail_(coords.length ? coords : CONFIG.PASTORAL, (u.nombre || u.email) + ' no podrá ir · ' + ent.nombre,
+  if (!coords.length) { notificar_('ausencia', (u.nombre || u.email) + ' no podrá ir a ' + ent.nombre, fechaLarga_(fecha) + ' · ' + hhmm_(t.inicio), 'personas'); return; }
+  mail_(coords, (u.nombre || u.email) + ' no podrá ir · ' + ent.nombre,
     `<p><b>${esc_(u.nombre || u.email)}</b> ha avisado de que <b>no podrá ir</b> al voluntariado de <b>${esc_(ent.nombre)}</b> el ${esc_(fechaLarga_(fecha))} (${esc_(hhmm_(t.inicio))}–${esc_(hhmm_(t.fin))}).</p><p>Puedes responder a este correo para escribirle.</p>`,
     'Ver horarios', 'chorario', u.email);
 }
@@ -974,6 +992,7 @@ function pagina_(titulo, texto) {
 /** Se ejecuta cada día (lo instala la app sola). Envía el recordatorio de los encuentros de mañana. */
 function enviarRecordatorios() {
   resetCache_();
+  try { resumenNotificaciones_(true); } catch (e) { Logger.log(e); }
   const man = hoyISO_(1);
   const ya = new Set(rows_('Recordatorios').map(r => String(r.turno) + '|' + iso_(r.fecha) + '|' + r.email));
   const apuntados = rows_('Apuntados');
@@ -1147,6 +1166,37 @@ function mailAgradecimiento_(ins, me) {
      <p>Mientras tanto, puedes entrar en la app con esta cuenta de Google para ir completando tu documentación: el certificado de delitos de naturaleza sexual y el compromiso de voluntariado.</p>
      <p style="margin-bottom:0">Un abrazo,<br>El equipo de Pastoral<br><span style="color:#6E8193;font-size:13px">Centro Universitario Sagrada Familia</span></p>`,
     'Entrar en la app', 'docs', CONFIG.CORREO_EQUIPO);
+}
+
+// ───────────────────────── NOTIFICACIONES PARA PASTORAL ─────────────────────────
+function equipoPastoral_() { return CONFIG.PASTORAL.map(norm_).filter(e => e.indexOf('@') > 0 && e.indexOf('correo_de') !== 0); }
+function notificar_(tipo, titulo, detalle, vista) {
+  try {
+    withLock_(() => append_('Notificaciones', { id: Utilities.getUuid().slice(0, 10), fecha: new Date(), tipo, titulo: String(titulo).slice(0, 200), detalle: String(detalle || '').slice(0, 300), vista: vista || 'panel', leidaPor: '', resumidaPara: '' }));
+    resumenNotificaciones_(false);
+  } catch (e) { Logger.log('No se pudo guardar la notificación: ' + e); }
+}
+// Envía a cada persona de Pastoral un correo con lo que tiene sin leer y aún no se le ha resumido,
+// si se han acumulado CONFIG.AVISO_ACUMULADAS o, en el repaso diario, si hay alguna de hace más de un día.
+function resumenNotificaciones_(diario) {
+  const rows = rows_('Notificaciones');
+  equipoPastoral_().forEach(email => {
+    const pend = rows.filter(n => splitList_(n.leidaPor).indexOf(email) < 0 && splitList_(n.resumidaPara).indexOf(email) < 0);
+    if (!pend.length) return;
+    const viejas = pend.some(n => daysAgo_(n.fecha) >= 1);
+    if (!(pend.length >= (CONFIG.AVISO_ACUMULADAS || 5) || (diario && viejas))) return;
+    const items = pend.slice(-30).reverse().map(n => `<li style="margin-bottom:6px"><b>${esc_(n.titulo)}</b>${n.detalle ? '<br><span style="color:#4A5C6E;font-size:14px">' + esc_(n.detalle) + '</span>' : ''}</li>`).join('');
+    mail_([email], pend.length + (pend.length === 1 ? ' aviso pendiente' : ' avisos pendientes') + ' en el Voluntariado Arrupe',
+      `<p>Tenéis ${pend.length === 1 ? 'un aviso' : pend.length + ' avisos'} sin revisar en la app:</p><ul style="padding-left:20px">${items}</ul>${pend.length > 30 ? '<p>…y algunos más.</p>' : ''}<p>Los avisos se marcan como leídos al abrirlos en la app.</p>`,
+      'Ver los avisos', 'avisos');
+    const ids = new Set(pend.map(n => String(n.id)));
+    withLock_(() => {
+      const sh = sheet_('Notificaciones'), vals = sh.getDataRange().getValues(), head = vals[0];
+      const iId = head.indexOf('id'), iR = head.indexOf('resumidaPara');
+      for (let r = 1; r < vals.length; r++) if (ids.has(String(vals[r][iId]))) { const l = splitList_(vals[r][iR]); if (l.indexOf(email) < 0) { l.push(email); sh.getRange(r + 1, iR + 1).setValue(l.join(',')); } }
+      delete _cache.Notificaciones;
+    });
+  });
 }
 
 // ───────────────────────── AYUDANTES ─────────────────────────
