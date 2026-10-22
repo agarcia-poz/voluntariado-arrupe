@@ -58,6 +58,8 @@ Tiempo estimado: unos 30 minutos. No hay que instalar nada en tu ordenador.
 
 El código ya está subido al repositorio `agarcia-poz/voluntariado-arrupe`. Solo hay que encender la publicación:
 
+> **Antes:** con una cuenta gratuita de GitHub, Pages solo funciona en repositorios **públicos**. Si el tuyo es privado, ve a **Settings → General**, baja hasta **Danger Zone → Change repository visibility** y elige **Public**. No expone nada sensible: el repositorio solo tiene código; los datos están en tu Drive.
+
 1. En GitHub, abre el repositorio y ve a **Settings → Pages**.
 2. En **Build and deployment**, elige **Source: Deploy from a branch**.
 3. En **Branch**, elige **main** y la carpeta **/docs**. Pulsa **Save**.
