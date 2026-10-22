@@ -106,7 +106,7 @@ function demoPastoral(base) {
     docs: { cert: { estado: cert, url: cert === 'pend' ? '' : '#', fecha: dIso(-10) }, comp: { estado: comp, url: '', fecha: dIso(-8) } }, horas, telefono: '6' + String(Math.abs(nombre.length * 7919)).padStart(8, '1').slice(0, 8), emailContacto: '', emergencia: '',
     compromiso: comp === 'ok' ? { dni: '••••••••X', fecha: dIso(-8), hasta: '2027-06-30', actividades: '' } : null }, extra || {});
   const personas = [
-    P('andres@demo', 'Andrés García Pozas', '', 'pastoral', [], 'pend', 'pend', 0, { docs: { cert: { estado: 'pend', url: '' }, comp: { estado: 'pend', url: '' } } }),
+    P('pastoral@demo', 'Equipo de Pastoral', '', 'pastoral', [], 'pend', 'pend', 0, { docs: { cert: { estado: 'pend', url: '' }, comp: { estado: 'pend', url: '' } } }),
     P('clara.ortega@cusafa.es', 'Clara Ortega Vílchez', '4.º Ed. Infantil', 'coord', ['hogar'], 'ok', 'ok', 14, { coordEnts: ['hogar'] }),
     P('pablo.ruiz@cusafa.es', 'Pablo Ruiz Fernández', '4.º Ed. Primaria', 'coord', ['res', 'alz'], 'ok', 'ok', 22, { coordEnts: ['res'] }),
     P('lucia.martos@cusafa.es', 'Lucía Martos Ortega', '2.º Ed. Infantil', 'vol', ['hogar', 'apoyo'], 'ok', 'pend', 13),
@@ -119,7 +119,7 @@ function demoPastoral(base) {
   ];
   const ins = (id, nombre, curso, dias, prefs, motivo, estado, entidad) => ({ id, fecha: dIso(-dias), nombre, email: nombre.split(' ')[0].toLowerCase() + '@cusafa.es', curso, preferencias: prefs, preferenciasTexto: '', motivo, estado, entidad: entidad || '' });
   return Object.assign(base, {
-    me: { email: 'andres@demo', nombre: 'Andrés García Pozas', rol: 'pastoral', estado: 'activo', curso: '', coordEnts: [], foto: '', telefono: '', emailContacto: '', emergenciaNombre: '', emergenciaTelefono: '', avisos: true },
+    me: { email: 'pastoral@demo', nombre: 'Equipo de Pastoral', rol: 'pastoral', estado: 'activo', curso: '', coordEnts: [], foto: '', telefono: '', emailContacto: '', emergenciaNombre: '', emergenciaTelefono: '', avisos: true },
     mio: { asignaciones: [], docs: { cert: { estado: 'pend' }, comp: { estado: 'pend' } }, horas: [], reflexiones: [], compromiso: null, turnos: [], proximos: [], misSubidas: 0 },
     pastoral: {
       personas,
@@ -631,7 +631,7 @@ function insResumen(list, sel) {
     <td class="tnum"><b>${r.pre}</b>${r.add ? ` <span class="pill info tnum">+${r.add} seleccionad${r.add === 1 ? 'a' : 'as'}</span>` : ''}</td>
     <td><div style="display:flex;align-items:center;gap:10px"><span class="tnum" style="min-width:52px"><b>${r.e.ocupadas}</b>/${r.e.cupo}</span><div class="bar" style="flex:1;min-width:60px;position:relative"><i style="width:${r.e.cupo ? Math.min(100, r.e.ocupadas / r.e.cupo * 100) : 0}%"></i>${r.add ? `<i style="position:absolute;top:0;left:${r.e.cupo ? Math.min(100, r.e.ocupadas / r.e.cupo * 100) : 0}%;width:${r.e.cupo ? Math.max(0, Math.min(100, tras / r.e.cupo * 100) - Math.min(100, r.e.ocupadas / r.e.cupo * 100)) : 0}%;opacity:.45"></i>` : ''}</div>
       <span class="small ${pasa ? '' : 'muted'}" style="${pasa ? 'color:var(--bad);font-weight:600' : ''}">${pasa ? 'se pasa del cupo' : libre > 0 ? `quedan ${libre}` : 'completa'}</span></div></td></tr>`; }).join('')}
-  </tbody></table></div><p class="hint">Plazas ocupadas incluye a quienes ya sirven en la entidad, también la coordinación. Lo marcado en azul claro es lo que sumaría tu selección actual.</p></div>`;
+  </tbody></table></div><p class="hint">Plazas ocupadas incluye a quienes ya sirven en la entidad, también la coordinación. La parte más clara de la barra es lo que sumaría tu selección actual.</p></div>`;
 }
 function vIns() {
   const all = D.pastoral.inscripciones;
