@@ -28,7 +28,10 @@ const I = {
   arrow: '<path d="M5 12h14M12 5l7 7-7 7"/>',
   compass: '<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/>',
   chart: '<path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/>',
-  ext: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>'
+  ext: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+  camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
+  pen: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>'
 };
 const ic = (n, s = 20) => `<svg class="ico" width="${s}" height="${s}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${I[n] || ''}</svg>`;
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -40,7 +43,7 @@ const IG = 'https://www.instagram.com/unisafa/';
 
 /* ───────── estado ───────── */
 let TOKEN = null, D = null;
-const S = { view: null, ent: null, leaving: null, cent: null, assigning: null, insFilter: 'nueva', q: '', editP: null, editE: null, editN: null, delN: null, delSes: null, rejecting: null, att: null, err: '' };
+const S = { gal: {}, cf: {}, resign: false, tf: null, delT: null, delM: null, upMsg: '', fent: null, view: null, ent: null, leaving: null, cent: null, assigning: null, insFilter: 'nueva', q: '', editP: null, editE: null, editN: null, delN: null, delSes: null, rejecting: null, att: null, err: '' };
 try { TOKEN = sessionStorage.getItem('arrupe-token'); } catch (e) { }
 let CODE = null;
 try {
@@ -80,9 +83,26 @@ const DEMO_ENTS = [
   ['ilu', 'Proyecto Ilusión Baeza', 'Baeza', 'Infancia', 'green', 'Tardes de ocio educativo con menores. Juego, convivencia y mucha energía.', '1–2 sábados al mes, 17:00–21:00.', 12, 'https://www.instagram.com/reel/DR4RtaHjM3N/', ['Gustavo P.', 'María R.'], 8],
   ['apro', 'APROMPSI Úbeda', 'Úbeda', 'Diversidad', 'teal', 'Actividades con personas con discapacidad intelectual: fútbol, zumba, teatro y baile.', 'Jueves: fútbol 16–18 h · zumba 17–18 h · teatro y baile 18–20 h.', 8, 'https://www.instagram.com/reel/DR39H0eDBh8/', ['Lorena P.', 'Ramón S.'], 5]
 ].map(e => ({ id: e[0], nombre: e[1], lugar: e[2], etiqueta: e[3], color: e[4], descripcion: e[5], horario: e[6], cupo: e[7], ig: e[8], activa: true, coordinadores: e[9], ocupadas: e[10] }));
+const DOW = iso => ((new Date(iso + 'T12:00:00Z').getUTCDay() + 6) % 7) + 1;
+function demoOcc(t, dias) { const out = []; for (let i = 0; i <= dias; i++) { const f = dIso(i); if (t.tipo === 'fecha' ? t.fecha === f : DOW(f) === t.dia) out.push(f); } return out; }
+function demoTurnos() {
+  const d1 = DOW(dIso(1));
+  return [
+    { id: 't1', entidad: 'hogar', tipo: 'semanal', dia: d1, fecha: '', inicio: '17:00', fin: '18:00', lugar: 'Escuela Hogar · sala de estudio', nota: 'Apoyo con los deberes' },
+    { id: 't2', entidad: 'hogar', tipo: 'semanal', dia: (d1 + 1) % 7 + 1, fecha: '', inicio: '18:00', fin: '19:00', lugar: 'Escuela Hogar · patio', nota: '' },
+    { id: 't3', entidad: 'hogar', tipo: 'fecha', dia: 0, fecha: dIso(9), inicio: '16:30', fin: '19:30', lugar: 'SAFA Úbeda · gimnasio', nota: 'Fiesta de otoño con las familias' },
+    { id: 't4', entidad: 'apoyo', tipo: 'semanal', dia: (d1 + 2) % 7 + 1, fecha: '', inicio: '16:00', fin: '18:00', lugar: 'EE.PP. SAFA Úbeda · aula 3', nota: '' }
+  ];
+}
+function demoProximos(role) {
+  const T = demoTurnos(), out = [];
+  const ent = role === 'coord' ? ['hogar'] : ['hogar', 'apoyo'];
+  T.filter(t => ent.includes(t.entidad)).forEach(t => { if (role === 'vol' && t.id === 't2') return; demoOcc(t, 14).forEach((f, i) => out.push({ turno: t.id, entidad: t.entidad, fecha: f, inicio: t.inicio, fin: t.fin, lugar: t.lugar, nota: t.nota, respuesta: i === 0 && t.id === 't1' ? 'sí' : '' })); });
+  return out.sort((a, b) => (a.fecha + a.inicio) < (b.fecha + b.inicio) ? -1 : 1);
+}
 function demoData(role) {
   const base = {
-    config: { horasReferencia: 20, tiposDoc: { cert: 'Certificado de delitos de naturaleza sexual', comp: 'Compromiso de voluntariado' } },
+    config: { horasReferencia: 20, tiposDoc: { cert: 'Certificado de delitos de naturaleza sexual', comp: 'Compromiso de voluntariado' }, finCurso: '2027-06-30', hoy: dIso(0) },
     entidades: JSON.parse(JSON.stringify(DEMO_ENTS)),
     noticias: [
       { id: 'n1', fecha: dIso(6), titulo: 'Encuentro de inicio del Voluntariado Arrupe', detalle: 'Capilla del Centro Universitario · 13:30', tipo: 'Encuentro' },
@@ -100,24 +120,48 @@ function demoData(role) {
       ['alba.torres@cusafa.es', 'Alba Torres Medina', '1.º Ed. Infantil', [], 'pend', 'pend', 0, false, true],
       ['marta.jimenez@cusafa.es', 'Marta Jiménez Soto', '1.º Ed. Infantil', ['res'], 'ok', 'pend', 3, false, false]
     ].map(x => ({ email: x[0], nombre: x[1], curso: x[2], otras: x[3], cert: x[4], comp: x[5], horas: x[6], coordina: x[7], nuevo: x[8] }));
+    const tels = ['611 204 318', '622 845 107', '633 120 984', '644 567 201', '655 903 412', '666 718 225'];
+    equipo.forEach((p, i) => { p.telefono = tels[i]; p.emergencia = i % 2 ? '' : 'Madre · 600 000 00' + i; });
+    const T = demoTurnos().filter(t => t.entidad === 'hogar').map(t => Object.assign({}, t, { apuntados: t.id === 't1' ? ['Clara O.', 'Lucía M.', 'Carmen V.'] : t.id === 't2' ? ['Javier C.', 'Marta J.'] : [] }));
+    const proximos = [];
+    T.forEach(t => demoOcc(t, 14).forEach((f, k) => {
+      const nombres = t.tipo === 'fecha' ? equipo.map(p => p.nombre) : equipo.filter(p => t.apuntados.includes(p.nombre.split(' ')[0] + ' ' + p.nombre.split(' ')[1][0] + '.')).map(p => p.nombre);
+      proximos.push({ turno: t.id, fecha: f, inicio: t.inicio, fin: t.fin, lugar: t.lugar, personas: equipo.filter(p => nombres.includes(p.nombre)).map((p, j) => ({ email: p.email, nombre: p.nombre, respuesta: k === 0 ? (j === 0 || j === 1 ? 'sí' : j === 2 ? 'no' : '') : '' })) });
+    }));
+    proximos.sort((a, b) => (a.fecha + a.inicio) < (b.fecha + b.inicio) ? -1 : 1);
     return Object.assign(base, {
-      me: { email: 'clara.ortega@cusafa.es', nombre: 'Clara Ortega Vílchez', rol: 'coord', estado: 'activo', curso: '4.º Ed. Infantil', coordEnts: ['hogar'], foto: '' },
+      me: { email: 'clara.ortega@cusafa.es', nombre: 'Clara Ortega Vílchez', rol: 'coord', estado: 'activo', curso: '4.º Ed. Infantil', coordEnts: ['hogar'], foto: '', telefono: '611 204 318', emailContacto: '', emergenciaNombre: '', emergenciaTelefono: '', avisos: true },
       mio: { asignaciones: [{ entidad: 'hogar', estado: 'activa' }], docs: { cert: { estado: 'ok', fecha: dIso(-14), nota: '' }, comp: { estado: 'ok', fecha: dIso(-14), nota: '' } },
-        horas: [{ fecha: dIso(-2), entidad: 'hogar', horas: 2 }, { fecha: dIso(-7), entidad: 'hogar', horas: 2 }, { fecha: dIso(-9), entidad: 'hogar', horas: 1 }], reflexiones: [] },
+        horas: [{ fecha: dIso(-2), entidad: 'hogar', horas: 2 }, { fecha: dIso(-7), entidad: 'hogar', horas: 2 }, { fecha: dIso(-9), entidad: 'hogar', horas: 1 }], reflexiones: [],
+        compromiso: { nombre: 'Clara Ortega Vílchez', dni: '00000000T', telefono: '611 204 318', curso: '4.º Ed. Infantil', entidades: ['hogar'], actividades: 'Coordinación del equipo y apoyo en tareas', desde: dIso(-14), hasta: '2027-06-30', fecha: dIso(-14) },
+        turnos: demoTurnos().filter(t => t.entidad === 'hogar').map(t => Object.assign({}, t, { apuntado: t.id === 't1' })), proximos: demoProximos('coord').filter(p => p.turno !== 't2'), misSubidas: 4 },
       coord: { hogar: { equipo, sesiones: [
         { sesion: 's1', fecha: dIso(-2), entidad: 'hogar', horas: 2, personas: ['Clara O.', 'Lucía M.', 'Carmen V.', 'Marta J.'] },
         { sesion: 's2', fecha: dIso(-7), entidad: 'hogar', horas: 2, personas: ['Clara O.', 'Lucía M.', 'Javier C.', 'Carmen V.'] },
-        { sesion: 's3', fecha: dIso(-9), entidad: 'hogar', horas: 1, personas: ['Clara O.', 'Lucía M.', 'Carmen V.'] }] } }
+        { sesion: 's3', fecha: dIso(-9), entidad: 'hogar', horas: 1, personas: ['Clara O.', 'Lucía M.', 'Carmen V.'] }], turnos: T, proximos } }
     });
   }
   return Object.assign(base, {
-    me: { email: 'lucia.martos@cusafa.es', nombre: 'Lucía Martos Ortega', rol: 'vol', estado: 'activo', curso: '2.º Ed. Infantil', coordEnts: [], foto: '' },
+    me: { email: 'lucia.martos@cusafa.es', nombre: 'Lucía Martos Ortega', rol: 'vol', estado: 'activo', curso: '2.º Ed. Infantil', coordEnts: [], foto: '', telefono: '622 845 107', emailContacto: '', emergenciaNombre: 'Carmen Ortega (madre)', emergenciaTelefono: '600 000 001', avisos: true },
     mio: { asignaciones: [{ entidad: 'hogar', estado: 'activa' }, { entidad: 'apoyo', estado: 'activa' }],
       docs: { cert: { estado: 'ok', fecha: dIso(-12), nota: '' }, comp: { estado: 'pend', fecha: '', nota: '' } },
       horas: [{ fecha: dIso(-2), entidad: 'hogar', horas: 2 }, { fecha: dIso(-6), entidad: 'apoyo', horas: 2 }, { fecha: dIso(-7), entidad: 'hogar', horas: 2 }, { fecha: dIso(-9), entidad: 'hogar', horas: 1 }, { fecha: dIso(-13), entidad: 'apoyo', horas: 2 }, { fecha: dIso(-16), entidad: 'hogar', horas: 2 }, { fecha: dIso(-20), entidad: 'apoyo', horas: 2 }],
-      reflexiones: [{ fecha: dIso(-7), texto: 'Hoy Aitana me ha enseñado su cuaderno de dibujos. No sabía que llevaba semanas esperando a que se lo pidiera.' }] }
+      reflexiones: [{ fecha: dIso(-7), texto: 'Hoy Aitana me ha enseñado su cuaderno de dibujos. No sabía que llevaba semanas esperando a que se lo pidiera.' }],
+      compromiso: null, turnos: demoTurnos().map(t => Object.assign({}, t, { apuntado: t.id === 't1' || t.id === 't4' })), proximos: demoProximos('vol'), misSubidas: 1 }
   });
 }
+function demoThumb(i) {
+  const pal = [['#E58A00', '#F5C26B'], ['#D9007A', '#F59ACB'], ['#12679A', '#7FC0E6'], ['#25995A', '#9BDDB5'], ['#3A2A85', '#A99BEA'], ['#8E5A32', '#D8B08C']][i % 6];
+  const shapes = ['<circle cx="60" cy="70" r="26" fill="rgba(255,255,255,.55)"/><rect x="18" y="104" width="124" height="40" rx="12" fill="rgba(255,255,255,.35)"/>', '<path d="M20 130 L60 70 L90 110 L110 85 L145 130 Z" fill="rgba(255,255,255,.5)"/><circle cx="118" cy="45" r="14" fill="rgba(255,255,255,.7)"/>', '<path d="M80 128 L40 88 C26 74 26 52 41 41 C56 30 72 34 80 49 C88 34 104 30 119 41 C134 52 134 74 120 88 Z" fill="rgba(255,255,255,.6)"/>'][i % 3];
+  return 'data:image/svg+xml;base64,' + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160"><defs><linearGradient id="g" x2="1" y2="1"><stop offset="0" stop-color="${pal[0]}"/><stop offset="1" stop-color="${pal[1]}"/></linearGradient></defs><rect width="160" height="160" fill="url(#g)"/>${shapes}</svg>`);
+}
+let DEMO_GAL = [
+  { id: 'm1', mime: 'image/jpeg', fecha: dIso(-2), autor: 'Lucía M.', descripcion: 'Taller de manualidades de otoño', thumb: demoThumb(0), url: '' },
+  { id: 'm2', mime: 'image/jpeg', fecha: dIso(-2), autor: 'Clara O.', descripcion: 'Merienda en el patio', thumb: demoThumb(1), url: '' },
+  { id: 'm3', mime: 'video/mp4', fecha: dIso(-7), autor: 'Carmen V.', descripcion: 'Ensayo de la obra de teatro', thumb: demoThumb(2), url: '' },
+  { id: 'm4', mime: 'image/jpeg', fecha: dIso(-9), autor: 'Javier C.', descripcion: '', thumb: demoThumb(3), url: '' },
+  { id: 'm5', mime: 'image/jpeg', fecha: dIso(-12), autor: 'Clara O.', descripcion: 'Mural del equipo', thumb: demoThumb(4), url: '' }
+];
 function demoApi(action, d) {
   const D2 = DEMO, me = D2.me, short = n => { const p = n.split(' '); return p[0] + ' ' + p[1][0] + '.'; };
   switch (action) {
@@ -137,11 +181,20 @@ function demoApi(action, d) {
     case 'borrarSesion': Object.values(D2.coord).forEach(C => { C.sesiones = C.sesiones.filter(s => s.sesion !== d.sesion); }); return D2;
     case 'recordarDocumentos': return { enviados: D2.coord[d.entidad].equipo.filter(p => p.cert !== 'ok' || p.comp !== 'ok').length };
     case 'darBienvenida': D2.coord[d.entidad].equipo.forEach(p => { if (p.email === d.email) p.nuevo = false; }); return D2;
+    case 'guardarMisDatos': Object.assign(me, d); return D2;
+    case 'firmarCompromiso': D2.mio.compromiso = { nombre: d.nombre, dni: d.dni, telefono: d.telefono, curso: d.curso, entidades: D2.mio.asignaciones.filter(x => x.estado === 'activa').map(x => x.entidad), actividades: d.actividades, desde: todayISO(), hasta: '2027-06-30', fecha: todayISO() }; D2.mio.docs.comp = { estado: 'ok', fecha: todayISO(), nota: '' }; return D2;
+    case 'apuntarTurno': D2.mio.turnos.forEach(t => { if (t.id === d.turno) t.apuntado = !!d.apuntar; }); return D2;
+    case 'confirmarAsistencia': D2.mio.proximos.forEach(p => { if (p.turno === d.turno && p.fecha === d.fecha) p.respuesta = d.respuesta; }); return D2;
+    case 'guardarTurno': { const C = D2.coord[d.entidad]; const t = Object.assign({ id: 't' + Date.now(), entidad: d.entidad, apuntados: [] }, d); C.turnos.push(t); demoOcc(t, 14).forEach(f => C.proximos.push({ turno: t.id, fecha: f, inicio: t.inicio, fin: t.fin, lugar: t.lugar, personas: C.equipo.map(p => ({ email: p.email, nombre: p.nombre, respuesta: '' })) })); C.proximos.sort((x, y) => (x.fecha + x.inicio) < (y.fecha + y.inicio) ? -1 : 1); return D2; }
+    case 'borrarTurno': Object.values(D2.coord).forEach(C => { C.turnos = C.turnos.filter(t => t.id !== d.id); C.proximos = C.proximos.filter(p => p.turno !== d.id); }); return D2;
+    case 'subirMultimedia': DEMO_GAL.unshift({ id: 'm' + Date.now(), mime: d.mime, fecha: todayISO(), autor: short(me.nombre), descripcion: d.descripcion, thumb: d.mime.startsWith('image/') ? 'data:' + d.mime + ';base64,' + d.base64 : demoThumb(5), url: '' }); D2.mio.misSubidas = (D2.mio.misSubidas || 0) + 1; return { ok: true, misSubidas: D2.mio.misSubidas };
+    case 'galeria': return { entidad: d.entidad, items: DEMO_GAL.slice(), carpetaUrl: '' };
+    case 'quitarMultimedia': DEMO_GAL = DEMO_GAL.filter(m => m.id !== d.id); return { entidad: 'hogar', items: DEMO_GAL.slice(), carpetaUrl: '' };
     default: throw new Error('En el modo demostración esta acción no está disponible');
   }
 }
 function startDemo(role) {
-  DEMO = demoData(role); D = DEMO;
+  DEMO = demoData(role); D = DEMO; S.gal = {}; S.cf = {}; S.tf = null;
   S.view = null; S.ent = null; S.cent = null; S.att = null; S.leaving = null;
   render.keepScroll = false; render(); window.scrollTo(0, 0);
 }
@@ -220,11 +273,13 @@ function caps() {
 }
 function nav() {
   const c = caps();
-  if (c.pend) return [['espera', 'Tu cuenta', 'home'], ['explorar', 'Dónde servir', 'compass'], ['noticias', 'Noticias', 'bell']];
+  if (c.pend) return [['espera', 'Tu cuenta', 'home'], ['datos', 'Mis datos', 'user'], ['explorar', 'Dónde servir', 'compass'], ['noticias', 'Noticias', 'bell']];
   const n = [];
   if (c.isP) n.push(['panel', 'Panel', 'chart'], ['ins', 'Inscripciones', 'inbox'], ['personas', 'Personas', 'users'], ['invitaciones', 'Invitaciones', 'mail'], ['entidades', 'Entidades', 'building']);
-  if (c.isC) n.push(['cinicio', 'Mi entidad', 'building'], ['equipo', 'Equipo', 'users'], ['asistencia', 'Asistencia', 'clock']);
-  if (c.isVol) n.push(['vinicio', 'Mi voluntariado', 'home'], ['docs', 'Documentos', 'file'], ['horas', 'Mis horas', 'clock']);
+  if (c.isC) n.push(['cinicio', 'Mi entidad', 'building'], ['equipo', 'Equipo', 'users'], ['chorario', 'Horarios', 'calendar'], ['asistencia', 'Asistencia', 'check']);
+  if (c.isVol) n.push(['vinicio', 'Mi voluntariado', 'home'], ['horario', 'Mi horario', 'calendar'], ['docs', 'Documentos', 'file'], ['horas', 'Mis horas', 'clock']);
+  if (c.isVol || c.isC) n.push(['fotos', 'Fotos y vídeos', 'camera']);
+  if (!c.isP) n.push(['datos', 'Mis datos', 'user']);
   n.push(['explorar', 'Dónde servir', 'compass'], ['noticias', 'Noticias', 'bell']);
   return n;
 }
@@ -372,13 +427,17 @@ function vVinicio() {
 function vDocs() {
   const docs = D.mio.docs, T = D.config.tiposDoc;
   const help = { cert: 'Se pide en la sede electrónica del Ministerio de Justicia con certificado digital o Cl@ve. Es gratuito.', comp: 'Pide el modelo a tu coordinación, fírmalo y súbelo escaneado o en una foto legible.' };
-  const card = t => { const d = docs[t]; return `<div class="card doc"><div class="top"><div style="display:grid;gap:4px;min-width:0;flex:1 1 240px"><h2>${esc(T[t])}</h2><p class="muted small">${help[t] || ''}</p></div>${pill(d.estado)}</div>
+  const card = t => { const d = docs[t];
+    if (t === 'comp') { const c = D.mio.compromiso; return `<div class="card doc"><div class="top"><div style="display:grid;gap:4px;min-width:0;flex:1 1 240px"><h2>${esc(T[t])}</h2><p class="muted small">Se completa y se firma aquí mismo, en la app. Te llegará una copia por correo.</p></div>${c ? '<span class="pill ok">Firmado</span>' : pill(d.estado)}</div>
+      ${c ? `<p class="small muted">${ic('check', 16)} Firmado el ${fmtLong(c.fecha)}. Vigente hasta el ${fmtLong(c.hasta)}.</p><button class="btn ghost" data-go="compromiso" style="justify-self:start">Ver mi compromiso</button>`
+        : `<button class="btn primary" data-go="compromiso" style="justify-self:start">${ic('pen', 18)}Completar y firmar</button>`}</div>`; }
+    return `<div class="card doc"><div class="top"><div style="display:grid;gap:4px;min-width:0;flex:1 1 240px"><h2>${esc(T[t])}</h2><p class="muted small">${help[t] || ''}</p></div>${pill(d.estado)}</div>
     ${d.estado === 'rech' && d.nota ? `<p class="err">Motivo: ${esc(d.nota)}</p>` : ''}
     ${d.estado === 'ok' ? `<p class="small muted">${ic('check', 16)} Validado por el Servicio de Pastoral${d.fecha ? ' el ' + fmtLong(d.fecha) : ''}.</p>` :
       `<label class="file btn ${d.estado === 'rev' ? 'ghost' : 'primary'}" for="up-${t}">${ic('upload', 18)}${d.estado === 'rev' ? 'Sustituir archivo' : 'Subir PDF o foto'}<input type="file" id="up-${t}" data-up="${t}" accept="application/pdf,image/jpeg,image/png,image/heic,image/heif,image/webp"></label><span class="hint">Máximo 10 MB.</span>`}
   </div>`; };
   return header('Documentación', 'Tus documentos', 'Son necesarios para empezar a servir. Se entregan una sola vez por curso, aunque estés en varios voluntariados.') +
-    `<div class="note">${ic('lock', 18)}<span>Tus archivos se guardan en una carpeta privada. <b>Solo el Servicio de Pastoral puede abrirlos.</b> Tu coordinación únicamente ve si están entregados y validados, nunca el archivo.</span></div>
+    `<div class="note">${ic('lock', 18)}<span>Tu certificado y tus datos se guardan de forma privada. <b>Solo el Servicio de Pastoral puede verlos.</b> Tu coordinación únicamente ve si están entregados y validados.</span></div>
     <div class="grid g2">${Object.keys(T).map(card).join('')}</div>`;
 }
 function vHoras() {
@@ -410,13 +469,14 @@ function vCinicio() {
       <button class="btn ghost sm" data-act="remind" style="justify-self:start">${ic('mail', 16)}Recordar por correo a quienes les falta algo</button>` : '<div class="empty">Todo el equipo está al día.</div>'}
     </div>
     <div class="card"><h2>Próximo en la agenda</h2>${proximas().length ? `<div class="list">${proximas().slice(0, 3).map(newsRow).join('')}</div>` : '<p class="muted small">No hay encuentros próximos publicados.</p>'}</div>
-  </div>`;
+  </div>
+  ${galeriaCard(S.cent)}`;
 }
 function vEquipo() {
   const sel = centSel(), e = E(S.cent), t = D.coord[S.cent].equipo;
   return header('Coordinación', 'Tu equipo', `${t.length} ${t.length === 1 ? 'persona sirve' : 'personas sirven'} en ${esc(e.nombre)}.`, sel + `<button class="btn ghost" data-act="copy-emails">${ic('mail', 18)}Copiar correos del equipo</button>`) +
-    (t.length ? `<div class="table-wrap"><table><thead><tr><th>Voluntario/a</th><th>Curso</th><th>Correo</th><th>También en</th><th>Certificado</th><th>Compromiso</th><th>Horas aquí</th></tr></thead><tbody>
-    ${t.map(p => `<tr><td><b>${esc(p.nombre)}</b>${p.coordina ? ' <span class="pill info">Coordina</span>' : ''}</td><td class="muted">${esc(p.curso)}</td><td class="small">${esc(p.email)}</td><td><div class="chips">${p.otras.map(chip).join('') || '<span class="hint">—</span>'}</div></td><td>${pill(p.cert)}</td><td>${pill(p.comp)}</td><td class="tnum"><b>${nf(p.horas)} h</b></td></tr>`).join('')}
+    (t.length ? `<div class="table-wrap"><table><thead><tr><th>Voluntario/a</th><th>Curso</th><th>Contacto</th><th>También en</th><th>Certificado</th><th>Compromiso</th><th>Horas aquí</th></tr></thead><tbody>
+    ${t.map(p => `<tr><td><b>${esc(p.nombre)}</b>${p.coordina ? ' <span class="pill info">Coordina</span>' : ''}</td><td class="muted">${esc(p.curso)}</td><td class="small">${esc(p.email)}${p.telefono ? `<br><b>${esc(p.telefono)}</b>` : ''}${p.emergencia ? `<br><span class="hint">Emergencias: ${esc(p.emergencia)}</span>` : ''}</td><td><div class="chips">${p.otras.map(chip).join('') || '<span class="hint">—</span>'}</div></td><td>${pill(p.cert)}</td><td>${pill(p.comp)}</td><td class="tnum"><b>${nf(p.horas)} h</b></td></tr>`).join('')}
     </tbody></table></div>` : '<div class="empty">Aún no hay nadie asignado. Pastoral te avisará por correo cuando incorpore a alguien.</div>');
 }
 function vAsistencia() {
@@ -427,7 +487,7 @@ function vAsistencia() {
     <div class="form-grid"><div class="field"><label for="attDate">Fecha</label><input type="date" id="attDate" value="${S.att.date}" max="${todayISO()}"></div>
       <div class="field"><span style="font-weight:600;font-size:.88rem">Duración</span><div class="stepper"><button data-act="h-" aria-label="Menos tiempo">−</button><span class="tnum" id="attH">${nf(S.att.h)} h</span><button data-act="h+" aria-label="Más tiempo">+</button></div></div></div>
     ${t.length ? `<div class="list">${t.map((p, i) => `<label class="row check" for="a${i}"><input type="checkbox" id="a${i}" data-att="${esc(p.email)}" ${S.att.sel.has(p.email) ? 'checked' : ''}><span class="grow"><b>${esc(p.nombre)}</b><span class="small muted">${esc(p.curso)}</span></span></label>`).join('')}</div>
-    <div class="actions"><button class="btn primary" data-act="save-att">${ic('check', 18)}Guardar sesión</button><button class="btn ghost" data-act="all-att">Marcar a todos</button></div>` : '<div class="empty">No hay nadie en el equipo todavía.</div>'}
+    <div class="actions"><button class="btn primary" data-act="save-att">${ic('check', 18)}Guardar sesión</button>${(() => { const n = confirmadosEn(S.att.date).length; return n ? `<button class="btn ghost" data-act="att-conf">Marcar a quienes confirmaron (${n})</button>` : ''; })()}<button class="btn ghost" data-act="all-att">Marcar a todos</button></div>` : '<div class="empty">No hay nadie en el equipo todavía.</div>'}
   </div>
   <div class="card"><h2>Sesiones registradas</h2>${C.sesiones.length ? `<div class="list">${C.sesiones.slice(0, 30).map(l => `<div class="row"><span class="tnum" style="width:70px">${fmt(l.fecha)}</span><div class="grow small muted">${esc(l.personas.join(', '))}</div><b class="tnum">${l.personas.length} × ${nf(l.horas)} h</b>
     ${S.delSes === l.sesion ? `<span class="actions"><button class="btn danger sm" data-delses="${esc(l.sesion)}">Borrar</button><button class="btn ghost sm" data-act="cancel-delses">No</button></span>` : `<button class="btn ghost sm" data-askdelses="${esc(l.sesion)}" aria-label="Borrar sesión">Borrar</button>`}</div>`).join('')}</div>` : '<p class="muted small">Aún no has registrado ninguna sesión.</p>'}</div></div>`;
@@ -440,7 +500,7 @@ function vPanel() {
   const multi = act.filter(p => p.asignaciones.filter(a => a.estado === 'activa').length > 1).length;
   const nIns = D.pastoral.inscripciones.filter(i => i.estado === 'nueva').length;
   const pp = pendientesPastoral();
-  return header('Servicio de Pastoral', 'Panel del Voluntariado Arrupe', 'Lo que necesita una mirada vuestra hoy.', `<button class="btn primary" data-demo="coord">${ic('users', 18)}Ver demostración</button><a class="btn ghost" href="${safeUrl(D.pastoral.hojaUrl)}" target="_blank" rel="noopener">${ic('ext', 18)}Hoja de datos</a><a class="btn ghost" href="${safeUrl(D.pastoral.carpetaUrl)}" target="_blank" rel="noopener">${ic('lock', 18)}Carpeta de documentos</a>`) +
+  return header('Servicio de Pastoral', 'Panel del Voluntariado Arrupe', 'Lo que necesita una mirada vuestra hoy.', `<button class="btn primary" data-demo="coord">${ic('users', 18)}Ver demostración</button><a class="btn ghost" href="${safeUrl(D.pastoral.hojaUrl)}" target="_blank" rel="noopener">${ic('ext', 18)}Hoja de datos</a><a class="btn ghost" href="${safeUrl(D.pastoral.carpetaUrl)}" target="_blank" rel="noopener">${ic('lock', 18)}Carpeta de documentos</a>${D.pastoral.multimediaUrl ? `<a class="btn ghost" href="${safeUrl(D.pastoral.multimediaUrl)}" target="_blank" rel="noopener">${ic('camera', 18)}Fotos y vídeos</a>` : ''}`) +
     `<div class="kpis"><div class="kpi ${nIns ? 'alert' : ''}"><b class="tnum">${nIns}</b><span>inscripciones por preseleccionar</span></div>
    <div class="kpi"><b class="tnum">${act.length}</b><span>personas sirviendo · ${multi} en varias</span></div>
    <div class="kpi ${inc ? 'alert' : ''}"><b class="tnum">${inc}</b><span>con documentación incompleta</span></div>
@@ -504,6 +564,9 @@ function editPersona() {
       <div class="field wide"><span style="font-weight:600;font-size:.88rem">Coordina</span><div class="checks">${ents.map(e => `<label><input type="checkbox" data-pcoord="${esc(e.id)}" ${p.coordEnts.includes(e.id) ? 'checked' : ''}>${esc(e.nombre)}</label>`).join('')}</div><span class="hint">Quien coordina ve el equipo, registra asistencia y ve el estado (no el archivo) de la documentación de esa entidad.</span></div>
     </div>
     <div class="actions"><button class="btn primary" data-act="save-p">${ic('check', 18)}Guardar</button></div>
+    ${isNew ? '' : `<div><span class="eyebrow">Contacto</span><div class="list">
+      <div class="row"><div class="grow"><b>Teléfono</b><span class="muted small">${esc(p.telefono || '—')}</span></div><div class="grow"><b>Correo de contacto</b><span class="muted small">${esc(p.emailContacto || p.email)}</span></div><div class="grow"><b>Emergencias</b><span class="muted small">${esc(p.emergencia || '—')}</span></div></div>
+      ${p.compromiso ? `<div class="row"><div class="grow"><b>Compromiso firmado</b><span class="muted small">El ${fmtLong(p.compromiso.fecha)} · documento ${esc(p.compromiso.dni)} · vigente hasta el ${fmtLong(p.compromiso.hasta)}${p.compromiso.actividades ? ' · ' + esc(p.compromiso.actividades) : ''}</span></div></div>` : ''}</div></div>`}
     ${isNew ? '' : `<div><span class="eyebrow">Documentación</span><div class="list">${Object.keys(D.config.tiposDoc).map(docRow).join('')}</div></div>`}
   </div>`;
 }
@@ -605,8 +668,177 @@ function editNoticia() {
     <div class="actions"><button class="btn primary" data-act="save-n">${ic('check', 18)}Publicar</button></div></div>`;
 }
 
+/* --- horarios --- */
+const DIAS = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+const dow = iso => ((new Date(iso + 'T12:00:00Z').getUTCDay() + 6) % 7) + 1;
+function nextDow(d) { let x = todayISO(); for (let i = 0; i < 7; i++) { const iso = new Date(new Date(x + 'T12:00:00Z').getTime() + i * 86400000).toISOString().slice(0, 10); if (dow(iso) === d) return iso; } return x; }
+function gcal(t, ent) {
+  const date = t.tipo === 'fecha' ? t.fecha : (t.fecha && t.tipo !== 'fecha' ? t.fecha : nextDow(t.dia));
+  const ymd = date.replace(/-/g, ''), hm = s => String(s || '00:00').replace(':', '') + '00';
+  const u = new URLSearchParams({ action: 'TEMPLATE', text: 'Voluntariado · ' + ent.nombre, dates: ymd + 'T' + hm(t.inicio) + '/' + ymd + 'T' + hm(t.fin), ctz: 'Europe/Madrid', location: t.lugar || ent.lugar || '', details: 'Voluntariado Arrupe · Servicio de Pastoral CUSAFA' + (t.nota ? '\n' + t.nota : '') + '\n' + location.origin + location.pathname });
+  if (t.tipo === 'semanal') u.set('recur', 'RRULE:FREQ=WEEKLY;UNTIL=' + String(D.config.finCurso || '2027-06-30').replace(/-/g, '') + 'T235959Z');
+  return 'https://calendar.google.com/calendar/render?' + u.toString();
+}
+const turnoTxt = t => t.tipo === 'semanal' ? `Cada ${DIAS[t.dia]} · ${esc(t.inicio)}–${esc(t.fin)}` : `${fmtLong(t.fecha)} · ${esc(t.inicio)}–${esc(t.fin)}`;
+const calBtn = (t, ent) => `<a class="btn ghost sm" href="${esc(gcal(t, ent))}" target="_blank" rel="noopener">${ic('calendar', 16)}Añadir a Google Calendar</a>`;
+function respPill(r) { return r === 'sí' ? '<span class="pill ok">Confirma</span>' : r === 'no' ? '<span class="pill bad">No puede</span>' : '<span class="pill" style="background:var(--surface-2);color:var(--fg-3)">Sin respuesta</span>'; }
+function vHorario() {
+  const ents = misEnts(), T = D.mio.turnos || [], P = D.mio.proximos || [];
+  return header('Horario', 'Tu horario', 'Los turnos y encuentros que fija tu coordinación. El día antes te llega un recordatorio por correo para confirmar.') +
+  `<div class="card"><h2>Próximos encuentros</h2>${P.length ? `<div class="list">${P.map(p => { const e = E(p.entidad), t = T.find(x => x.id === p.turno) || p; return `<div class="row" style="--c:${cvar(e.color)}"><div style="width:52px;text-align:center;flex:none"><b class="tnum" style="font-family:var(--display);font-size:1.15rem;display:block;line-height:1">${new Date(p.fecha + 'T12:00').getDate()}</b><span class="small muted">${new Date(p.fecha + 'T12:00').toLocaleDateString('es-ES', { month: 'short' })}</span></div>
+      <div class="grow"><b>${esc(e.nombre)}</b><span class="muted small">${fmtLong(p.fecha)} · ${esc(p.inicio)}–${esc(p.fin)} · ${esc(p.lugar || e.lugar)}</span></div>
+      <span class="actions"><button class="btn sm ${p.respuesta === 'sí' ? 'primary' : 'ghost'}" data-conf="${esc(p.turno)}|${p.fecha}|sí" aria-pressed="${p.respuesta === 'sí'}">Voy</button><button class="btn sm ${p.respuesta === 'no' ? 'danger' : 'ghost'}" data-conf="${esc(p.turno)}|${p.fecha}|no" aria-pressed="${p.respuesta === 'no'}">No podré ir</button></span></div>`; }).join('')}</div>`
+    : '<p class="muted small">No tienes encuentros en las próximas dos semanas.</p>'}</div>
+  <div class="grid g2">${ents.map(id => { const e = E(id), ts = T.filter(t => t.entidad === id); return `<div class="card" style="--c:${cvar(e.color)};border-top:5px solid ${cvar(e.color)}"><h2>${esc(e.nombre)}</h2><p class="muted small">${esc(e.horario)}</p>
+    ${ts.length ? `<div class="list">${ts.map(t => `<div class="row"><div class="grow"><b>${turnoTxt(t)}</b><span class="muted small">${esc(t.lugar || e.lugar)}${t.nota ? ' · ' + esc(t.nota) : ''}</span></div>
+      ${t.tipo === 'semanal' ? `<label class="check small" for="ap-${esc(t.id)}"><input type="checkbox" id="ap-${esc(t.id)}" data-apuntar="${esc(t.id)}" ${t.apuntado ? 'checked' : ''}>Es mi turno</label>` : ''}${calBtn(t, e)}</div>`).join('')}</div>
+      ${ts.some(t => t.tipo === 'semanal') ? '<p class="hint">Marca los turnos semanales a los que vas. Si no marcas ninguno, te avisaremos de todos.</p>' : ''}`
+      : '<p class="muted small">Tu coordinación aún no ha fijado los turnos. Te aparecerán aquí.</p>'}</div>`; }).join('') || '<div class="empty">Aún no tienes un voluntariado asignado.</div>'}</div>`;
+}
+function confirmadosEn(fecha) { const C = D.coord && D.coord[S.cent]; if (!C || !C.proximos) return []; return [...new Set(C.proximos.filter(p => p.fecha === fecha).flatMap(p => p.personas.filter(x => x.respuesta === 'sí').map(x => x.email)))]; }
+function vChorario() {
+  const sel = centSel(), e = E(S.cent), C = D.coord[S.cent], T = C.turnos || [];
+  const f = S.tf || (S.tf = { tipo: 'semanal', dia: 1, fecha: todayISO(), inicio: '17:00', fin: '18:00', lugar: e.lugar, nota: '' });
+  return header('Coordinación', 'Horarios', `Fija los turnos de ${esc(e.nombre)}. Cada persona recibe un recordatorio por correo el día antes, con botones para confirmar o avisar si no puede.`, sel) +
+  `<div class="grid g2"><div class="card"><h2>Turnos y encuentros</h2>
+    ${T.length ? `<div class="list">${T.map(t => `<div class="row"><div class="grow"><b>${turnoTxt(t)}</b><span class="muted small">${esc(t.lugar || e.lugar)}${t.nota ? ' · ' + esc(t.nota) : ''}${t.tipo === 'semanal' ? ' · ' + (t.apuntados.length ? 'van: ' + esc(t.apuntados.join(', ')) : 'nadie lo ha elegido aún: se avisa a todo el equipo') : ' · se avisa a todo el equipo'}</span></div>
+      ${S.delT === t.id ? `<span class="actions"><button class="btn danger sm" data-delturno="${esc(t.id)}">Quitar</button><button class="btn ghost sm" data-act="cancel-delt">No</button></span>` : `<button class="btn ghost sm" data-askdelt="${esc(t.id)}">Quitar</button>`}</div>`).join('')}</div>` : '<p class="muted small">Todavía no hay turnos. Añade el primero.</p>'}
+    <div style="border-top:1px solid var(--line);padding-top:14px;display:grid;gap:12px"><h3>Añadir</h3>
+      <div class="filters" role="group" aria-label="Tipo"><button data-tftipo="semanal" aria-pressed="${f.tipo === 'semanal'}">Cada semana</button><button data-tftipo="fecha" aria-pressed="${f.tipo === 'fecha'}">Una fecha concreta</button></div>
+      <div class="form-grid">
+        ${f.tipo === 'semanal' ? `<div class="field"><label for="tfDia">Día</label><select id="tfDia">${DIAS.slice(1).map((d, i) => `<option value="${i + 1}" ${Number(f.dia) === i + 1 ? 'selected' : ''}>${d[0].toUpperCase() + d.slice(1)}</option>`).join('')}</select></div>`
+          : `<div class="field"><label for="tfFecha">Fecha</label><input type="date" id="tfFecha" value="${esc(f.fecha)}" min="${todayISO()}"></div>`}
+        <div class="field"><label for="tfIni">Empieza</label><input type="time" id="tfIni" value="${esc(f.inicio)}"></div>
+        <div class="field"><label for="tfFin">Termina</label><input type="time" id="tfFin" value="${esc(f.fin)}"></div>
+        <div class="field wide"><label for="tfLugar">Lugar</label><input type="text" id="tfLugar" value="${esc(f.lugar)}"></div>
+        <div class="field wide"><label for="tfNota">Nota para el equipo (opcional)</label><input type="text" id="tfNota" value="${esc(f.nota)}" placeholder="Ej.: traed ropa deportiva"></div>
+      </div>
+      <button class="btn primary" data-act="save-turno" style="justify-self:start">${ic('check', 18)}Añadir turno</button></div>
+  </div>
+  <div class="card"><h2>Próximos 14 días</h2>${(C.proximos || []).length ? `<div class="list">${C.proximos.map(p => `<div class="row" style="align-items:flex-start"><div class="grow"><b>${fmtLong(p.fecha)} · ${esc(p.inicio)}–${esc(p.fin)}</b>
+      <div class="grid" style="gap:6px;margin-top:8px">${p.personas.map(x => `<div style="display:flex;justify-content:space-between;gap:8px;align-items:center"><span class="small">${esc(x.nombre)}</span>${respPill(x.respuesta)}</div>`).join('') || '<span class="hint">Nadie convocado</span>'}</div></div></div>`).join('')}</div>` : '<p class="muted small">No hay encuentros en las próximas dos semanas.</p>'}
+    <p class="hint">Los recordatorios salen cada día a las 10:00 para los encuentros del día siguiente.</p></div></div>`;
+}
+
+/* --- compromiso --- */
+function vCompromiso() {
+  const me = D.me, c = D.mio.compromiso, ents = misEnts().map(E);
+  const fin = D.config.finCurso || '2027-06-30';
+  const derechosVol = ['Recibir información, formación, orientación y apoyo, y los medios necesarios para sus funciones.', 'Ser respetado en sus derechos fundamentales, sin discriminación.', 'Participar de forma activa en la elaboración, ejecución y evaluación del programa.', 'Estar asegurado frente a accidentes y daños a terceros derivados de la acción voluntaria.', 'Recibir el reembolso de los gastos autorizados previamente.', 'Disponer de una acreditación como persona voluntaria.', 'Recibir reconocimiento por su contribución y un certificado de los servicios prestados.', 'Realizar la actividad en condiciones de seguridad e higiene.', 'Cesar en su condición de voluntario en los términos de este compromiso.'];
+  const deberesVol = ['Cumplir los compromisos adquiridos, respetando los fines y normas de la entidad.', 'Guardar confidencialidad sobre la información y las personas que conozca.', 'Rechazar cualquier contraprestación material o económica.', 'Respetar los derechos de las personas atendidas y actuar de forma diligente y solidaria.', 'Seguir las instrucciones para el buen desarrollo de la actividad.', 'Usar debidamente las acreditaciones y cuidar los recursos materiales.', 'Observar las medidas de seguridad e higiene.'];
+  const deberesEnt = ['Ofrecer información, formación, apoyo y los medios necesarios.', 'Favorecer la participación activa del voluntariado en la organización y evaluación.', 'Asegurar al voluntariado frente a accidentes y responsabilidad civil.', 'Abonar los gastos de dietas y transporte derivados de la actividad.', 'Facilitar una acreditación y expedir un certificado de participación.', 'Garantizar la actividad en condiciones de seguridad e higiene.'];
+  const lst = arr => `<ul style="margin:6px 0 0;padding-left:20px;display:grid;gap:4px">${arr.map(x => `<li>${x}</li>`).join('')}</ul>`;
+  const clausulas = `<details class="card" style="gap:10px"><summary style="cursor:pointer;font-weight:700">Derechos y obligaciones (léelos antes de firmar)</summary>
+    <div class="small" style="display:grid;gap:14px"><div><b>IV. La persona voluntaria tiene derecho a:</b>${lst(derechosVol)}</div><div><b>Y se compromete a:</b>${lst(deberesVol)}</div>
+    <div><b>V. La entidad se compromete a:</b>${lst(deberesEnt)}</div><div><b>VI. Extinción.</b> El compromiso termina por mutuo acuerdo o por voluntad de cualquiera de las partes, avisando con al menos 15 días de antelación.</div></div></details>`;
+  const entsHtml = ents.length ? `<div class="list">${ents.map(e => `<div class="row" style="--c:${cvar(e.color)}">${chip(e.id)}<div class="grow"><span class="muted small">${esc(e.lugar)} · ${esc(e.horario)}</span></div></div>`).join('')}</div>` : '<p class="err">Aún no tienes ningún voluntariado asignado. Podrás firmar cuando Pastoral te asigne uno.</p>';
+  if (c && !S.resign) return header('Documentación', 'Tu compromiso de voluntariado', 'Firmado en la app. Tienes una copia en tu correo.', `<button class="btn ghost" data-go="docs">← Documentos</button>`) +
+    `<div class="card"><div class="list">
+      <div class="row"><div class="grow"><b>Entre</b><span class="muted small">El centro SAFA-Úbeda (Fundación Escuelas Profesionales de la Sagrada Familia, CIF G23633266, Avda. de Cristo Rey, 25, Úbeda) y ${esc(c.nombre)}, con documento ${esc(c.dni)}.</span></div></div>
+      <div class="row"><div class="grow"><b>Voluntariado en</b><div class="chips" style="margin-top:6px">${c.entidades.map(chip).join('')}</div></div></div>
+      ${c.actividades ? `<div class="row"><div class="grow"><b>Actividades</b><span class="muted small">${esc(c.actividades)}</span></div></div>` : ''}
+      <div class="row"><div class="grow"><b>Vigencia</b><span class="muted small">Del ${fmtLong(c.desde)} al ${fmtLong(c.hasta)}</span></div></div>
+      <div class="row"><div class="grow"><b>Firma</b><span class="muted small">${esc(c.nombre)} · ${fmtLong(c.fecha)}</span></div></div></div>
+      <p class="hint">Si te incorporas a otro voluntariado, vuelve a firmarlo para que lo incluya.</p>
+      <button class="btn ghost" data-act="resign" style="justify-self:start">Volver a firmar</button></div>${clausulas}`;
+  return header('Documentación', 'Compromiso de voluntariado', `Curso ${String(D.config.hoy || todayISO()).slice(0, 4)}-${fin.slice(0, 4)} · Se firma aquí mismo y te llega una copia por correo.`, `<button class="btn ghost" data-go="docs">← Documentos</button>`) +
+  `<div class="card"><h2>Las partes</h2><p class="small"><b>De un lado,</b> el centro SAFA-Úbeda, de la Fundación Escuelas Profesionales de la Sagrada Familia (CIF G23633266), con sede en Avda. de Cristo Rey, 25, 23400 Úbeda, a través de su Servicio de Pastoral. <b>Y de otro,</b> la persona voluntaria:</p>
+    <div class="form-grid">
+      <div class="field"><label for="cNombre">Nombre y apellidos</label><input type="text" id="cNombre" value="${esc(S.cf.nombre ?? me.nombre)}" autocomplete="name"></div>
+      <div class="field"><label for="cDni">DNI, NIE o pasaporte</label><input type="text" id="cDni" value="${esc(S.cf.dni ?? '')}" autocomplete="off" style="text-transform:uppercase"></div>
+      <div class="field"><label for="cTel">Teléfono</label><input type="text" inputmode="tel" id="cTel" value="${esc(S.cf.telefono ?? me.telefono)}" autocomplete="tel"></div>
+      <div class="field"><label for="cCurso">Grado y curso</label><input type="text" id="cCurso" value="${esc(S.cf.curso ?? me.curso)}" placeholder="Ej.: 2.º Ed. Infantil"></div>
+      <div class="field wide"><label for="cEmail">Correo</label><input type="text" id="cEmail" value="${esc(me.email)}" readonly></div>
+    </div></div>
+  <div class="card"><h2>I y II. Objeto, lugar y horario</h2><p class="small">Colaborar como persona voluntaria en:</p>${entsHtml}
+    <div class="field"><label for="cAct">Actividades concretas (opcional)</label><textarea id="cAct" placeholder="Ej.: apoyo en las tareas escolares y juego en el tiempo libre">${esc(S.cf.actividades ?? '')}</textarea></div></div>
+  <div class="card"><h2>III. Duración</h2><p class="small">Desde hoy, ${fmtLong(todayISO())}, hasta el <b>${fmtLong(fin)}</b>.</p></div>
+  ${clausulas}
+  <div class="card"><h2>Aceptación y firma</h2>
+    <div class="grid" style="gap:10px">
+      ${[['derechos', 'He leído y acepto los derechos y obligaciones de la persona voluntaria y de la entidad.'], ['confidencialidad', 'Me comprometo a guardar confidencialidad sobre la información y las personas que conozca en el voluntariado.'], ['gratuidad', 'Entiendo que mi colaboración es voluntaria y que no recibiré contraprestación económica ni material.'], ['datos', 'Autorizo al Servicio de Pastoral a tratar mis datos para gestionar el voluntariado.']].map(([k, l]) => `<label class="check" for="ca-${k}" style="align-items:flex-start"><input type="checkbox" id="ca-${k}" data-cacepta="${k}" ${S.cf.acepta && S.cf.acepta[k] ? 'checked' : ''}><span class="small">${l}</span></label>`).join('')}
+    </div>
+    <div class="field"><label for="cFirma">Firma: escribe de nuevo tu nombre y apellidos</label><input type="text" id="cFirma" value="${esc(S.cf.firma ?? '')}" style="font-family:'Segoe Script','Bradley Hand',cursive;font-size:1.2rem"></div>
+    <p class="hint">Escribir tu nombre equivale a tu firma. Quedará registrado con la fecha y la hora.</p>
+    <button class="btn primary" data-act="sign-comp" style="justify-self:start" ${ents.length ? '' : 'disabled'}>${ic('pen', 18)}Firmar compromiso</button></div>`;
+}
+
+/* --- mis datos --- */
+function vDatos() {
+  const me = D.me;
+  return header('Tu cuenta', 'Mis datos', 'Tus datos de contacto. Los ven el Servicio de Pastoral y la coordinación de tus voluntariados.') +
+  `<div class="card"><div class="form-grid">
+    <div class="field"><label for="mNombre">Nombre y apellidos</label><input type="text" id="mNombre" value="${esc(me.nombre)}" autocomplete="name"></div>
+    <div class="field"><label for="mCurso">Grado y curso</label><input type="text" id="mCurso" value="${esc(me.curso)}" placeholder="Ej.: 2.º Ed. Infantil"></div>
+    <div class="field"><label for="mTel">Teléfono móvil</label><input type="text" inputmode="tel" id="mTel" value="${esc(me.telefono)}" autocomplete="tel"></div>
+    <div class="field"><label for="mEmail">Correo de la cuenta</label><input type="text" id="mEmail" value="${esc(me.email)}" readonly></div>
+    <div class="field wide"><label for="mEmailC">Otro correo de contacto (opcional)</label><input type="text" id="mEmailC" value="${esc(me.emailContacto)}" placeholder="Si prefieres que te escriban a otra dirección"></div>
+    <div class="field"><label for="mEmN">Contacto de emergencia</label><input type="text" id="mEmN" value="${esc(me.emergenciaNombre)}" placeholder="Nombre y parentesco"></div>
+    <div class="field"><label for="mEmT">Teléfono de emergencia</label><input type="text" inputmode="tel" id="mEmT" value="${esc(me.emergenciaTelefono)}"></div>
+    <label class="check wide" for="mAvisos"><input type="checkbox" id="mAvisos" ${me.avisos ? 'checked' : ''}>Quiero recibir el recordatorio por correo el día antes de cada encuentro</label>
+  </div><button class="btn primary" data-act="save-datos" style="justify-self:start">${ic('check', 18)}Guardar cambios</button></div>`;
+}
+
+/* --- fotos y vídeos --- */
+function entsMedia() { const c = caps(); return [...new Set(misEnts().concat(c.coordIds))]; }
+function vFotos() {
+  const ents = entsMedia();
+  if (!S.fent || !ents.includes(S.fent)) S.fent = ents[0];
+  return header('Comunidad', 'Fotos y vídeos', 'Comparte momentos de tu voluntariado. Se guardan en una carpeta privada de Pastoral para usarlos después en las redes del centro.') +
+  `<div class="note" style="background:var(--warn-soft)">${ic('shield', 18)}<span><b>Antes de hacer o subir una foto:</b> evita que aparezcan <b>menores reconocibles</b> (fotografía de espaldas, manos, objetos o planos lejanos) y pide permiso a cualquier persona adulta que salga. En residencias, centros de personas con discapacidad o en prisión, pregunta antes a la coordinación.</span></div>
+  ${ents.length ? `<div class="card"><div class="form-grid">
+    <div class="field"><label for="fEnt">Voluntariado</label><select id="fEnt">${ents.map(id => `<option value="${esc(id)}" ${id === S.fent ? 'selected' : ''}>${esc(E(id).nombre)}</option>`).join('')}</select></div>
+    <div class="field"><label for="fDesc">Qué estabais haciendo (opcional)</label><input type="text" id="fDesc" maxlength="300" placeholder="Ej.: taller de manualidades de otoño"></div>
+    <label class="check wide" for="fPermiso" style="align-items:flex-start"><input type="checkbox" id="fPermiso"><span class="small">Confirmo que no aparecen menores identificables y que las personas que salen han dado su permiso.</span></label>
+  </div>
+  <label class="file btn primary" for="fFiles" style="justify-self:start">${ic('upload', 18)}Elegir fotos o vídeos<input type="file" id="fFiles" accept="image/*,video/*" multiple></label>
+  <span class="hint">Hasta 25 MB por archivo. ${S.upMsg ? '<b>' + esc(S.upMsg) + '</b>' : ''}</span>
+  <p class="small muted">Has compartido ${D.mio.misSubidas || 0} ${D.mio.misSubidas === 1 ? 'archivo' : 'archivos'} este curso.${caps().isC ? ' La galería de tu entidad está en Mi entidad.' : ''}</p></div>`
+  : '<div class="empty">Podrás compartir fotos cuando tengas un voluntariado asignado.</div>'}`;
+}
+function galeriaCard(ent) {
+  const g = S.gal[ent];
+  if (g === undefined) { S.gal[ent] = null; loadGal(ent); }
+  const body = !g ? '<div class="boot" style="min-height:120px"><div class="spinner" role="status" aria-label="Cargando fotos"></div></div>'
+    : g.error ? `<p class="err">${esc(g.error)}</p>`
+    : g.items.length ? `<div class="gal">${g.items.map(m => `<figure class="gal-item">${m.thumb ? `<img src="${esc(m.thumb)}" alt="${esc(m.descripcion || 'Foto del voluntariado')}" loading="lazy">` : `<div class="gal-ph">${ic('camera', 28)}</div>`}${/^video/.test(m.mime) ? '<span class="gal-play" aria-label="Vídeo">▶</span>' : ''}
+        <figcaption><span>${esc(m.autor)} · ${fmt(m.fecha)}</span>${m.descripcion ? `<span class="hint">${esc(m.descripcion)}</span>` : ''}
+        ${S.delM === m.id ? `<span class="actions"><button class="btn danger sm" data-delmedia="${esc(m.id)}">Quitar</button><button class="btn ghost sm" data-act="cancel-delm">No</button></span>` : `<button class="signout" data-askdelm="${esc(m.id)}">Quitar</button>`}</figcaption></figure>`).join('')}</div>`
+    : '<p class="muted small">Todavía no hay fotos ni vídeos de esta entidad.</p>';
+  return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h2>Fotos y vídeos</h2><button class="btn ghost sm" data-go="fotos">${ic('upload', 16)}Subir</button></div>${body}
+    <p class="hint">Lo que suba tu equipo aparece aquí. Pastoral lo recoge para las redes del centro.</p></div>`;
+}
+async function loadGal(ent) {
+  try { const r = await api('galeria', { entidad: ent }); S.gal[ent] = r; }
+  catch (e) { S.gal[ent] = { error: e.message, items: [] }; }
+  if (D && S.view === 'cinicio') render();
+}
+async function uploadMedia(files) {
+  if (!$('fPermiso').checked) return toast('Marca la casilla sobre menores y permisos antes de subir');
+  const ent = $('fEnt').value, desc = $('fDesc').value.trim();
+  const list = [...files].filter(f => /^(image|video)\//.test(f.type));
+  if (!list.length) return toast('Elige fotos o vídeos');
+  $('busy').hidden = false;
+  let ok = 0;
+  for (let i = 0; i < list.length; i++) {
+    const f = list[i];
+    S.upMsg = `Subiendo ${i + 1} de ${list.length}…`; render();
+    if (f.size > 25 * 1024 * 1024) { toast(f.name + ' supera los 25 MB'); continue; }
+    try {
+      const b64 = await new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(String(rd.result).split(',')[1]); rd.onerror = rej; rd.readAsDataURL(f); });
+      const r = await api('subirMultimedia', { entidad: ent, nombre: f.name, mime: f.type, base64: b64, descripcion: desc, permiso: true });
+      D.mio.misSubidas = r.misSubidas; ok++;
+    } catch (e) { toast(e.message); }
+  }
+  $('busy').hidden = true;
+  delete S.gal[ent];
+  S.upMsg = ok ? `${ok} ${ok === 1 ? 'archivo subido' : 'archivos subidos'}. ¡Gracias!` : '';
+  render();
+  if (ok) toast(S.upMsg + (DEMO ? ' (demostración: no se guarda nada)' : ''));
+}
+
 /* ───────── render ───────── */
-const VIEWS = { espera: vEspera, explorar: vExplorar, vinicio: vVinicio, docs: vDocs, horas: vHoras, cinicio: vCinicio, equipo: vEquipo, asistencia: vAsistencia, panel: vPanel, ins: vIns, personas: vPersonas, invitaciones: vInvitaciones, entidades: vEntidades, noticias: vNoticias };
+const VIEWS = { horario: vHorario, chorario: vChorario, compromiso: vCompromiso, datos: vDatos, fotos: vFotos, espera: vEspera, explorar: vExplorar, vinicio: vVinicio, docs: vDocs, horas: vHoras, cinicio: vCinicio, equipo: vEquipo, asistencia: vAsistencia, panel: vPanel, ins: vIns, personas: vPersonas, invitaciones: vInvitaciones, entidades: vEntidades, noticias: vNoticias };
 function render() {
   const root = $('root');
   if (!D) {
@@ -618,7 +850,8 @@ function render() {
     return;
   }
   const n = nav();
-  if (!S.view || !n.some(x => x[0] === S.view)) {
+  const extra = caps().isVol ? ['compromiso'] : [];
+  if (!S.view || !(n.some(x => x[0] === S.view) || extra.includes(S.view))) {
     const h = (location.hash || '').slice(1);
     S.view = n.some(x => x[0] === h) ? h : n[0][0];
   }
@@ -627,6 +860,8 @@ function render() {
   window.scrollTo(0, render.keepScroll ? y : 0);
   render.keepScroll = true;
 }
+function readTf() { const g = id => ($(id) || {}).value; const o = {}; if ($('tfDia')) o.dia = g('tfDia'); if ($('tfFecha')) o.fecha = g('tfFecha'); ['inicio:tfIni', 'fin:tfFin', 'lugar:tfLugar', 'nota:tfNota'].forEach(s => { const [k, id] = s.split(':'); if ($(id)) o[k] = $(id).value; }); return o; }
+function readCf() { const g = id => $(id) ? $(id).value.trim() : undefined; const m = { nombre: 'cNombre', dni: 'cDni', telefono: 'cTel', curso: 'cCurso', actividades: 'cAct', firma: 'cFirma' }; Object.keys(m).forEach(k => { const v = g(m[k]); if (v !== undefined) S.cf[k] = k === 'dni' ? v.toUpperCase() : v; }); }
 function go(v) { S.view = v; S.ent = null; S.leaving = null; render.keepScroll = false; try { history.replaceState(null, '', '#' + v); } catch (e) { } render(); }
 
 /* ───────── eventos ───────── */
@@ -656,12 +891,43 @@ root.addEventListener('click', async ev => {
   if (d.reinv) return run('reenviarInvitacion', { codigo: d.reinv }, 'Invitación reenviada');
   if (d.askanul) { S.anul = d.askanul; return render(); }
   if (d.anul) { S.anul = null; return run('anularInvitacion', { codigo: d.anul }, 'Invitación anulada'); }
+  if (d.conf) { const [turno, fecha, respuesta] = d.conf.split('|'); return run('confirmarAsistencia', { turno, fecha, respuesta }, respuesta === 'sí' ? '¡Gracias! Asistencia confirmada' : 'Hemos avisado a tu coordinación'); }
+  if (d.tftipo) { S.tf = Object.assign(S.tf || {}, readTf(), { tipo: d.tftipo }); return render(); }
+  if (d.askdelt) { S.delT = d.askdelt; return render(); }
+  if (d.delturno) { S.delT = null; return run('borrarTurno', { id: d.delturno }, 'Turno quitado'); }
+  if (d.askdelm) { S.delM = d.askdelm; return render(); }
+  if (d.delmedia) { S.delM = null; $('busy').hidden = false; try { S.gal[S.cent] = await api('quitarMultimedia', { id: d.delmedia }); toast('Archivo quitado de la galería'); } catch (e) { toast(e.message); } $('busy').hidden = true; return render(); }
   if (d.welcome) return run('darBienvenida', { entidad: S.cent, email: d.welcome }, 'Correo de bienvenida enviado');
   switch (d.act) {
     case 'signout': if (DEMO) return exitDemo(); return signOut(false);
     case 'demo-exit': return exitDemo();
     case 'inv-parse': { S.invText = $('invText').value; S.inv = parseInv(S.invText); return render(); }
     case 'inv-back': S.inv = null; return render();
+    case 'cancel-delt': S.delT = null; return render();
+    case 'cancel-delm': S.delM = null; return render();
+    case 'att-conf': confirmadosEn(S.att.date).forEach(e => S.att.sel.add(e)); return render();
+    case 'resign': S.resign = true; S.cf = {}; return render();
+    case 'save-turno': {
+      const f = Object.assign(S.tf, readTf());
+      const r = await run('guardarTurno', { entidad: S.cent, tipo: f.tipo, dia: Number(f.dia), fecha: f.fecha, inicio: f.inicio, fin: f.fin, lugar: f.lugar, nota: f.nota }, 'Turno añadido');
+      if (r) { S.tf = null; render(); }
+      return;
+    }
+    case 'save-datos': {
+      const data = { nombre: $('mNombre').value.trim(), curso: $('mCurso').value.trim(), telefono: $('mTel').value.trim(), emailContacto: $('mEmailC').value.trim(), emergenciaNombre: $('mEmN').value.trim(), emergenciaTelefono: $('mEmT').value.trim(), avisos: $('mAvisos').checked };
+      if (data.nombre.length < 3) return toast('Escribe tu nombre y apellidos');
+      return run('guardarMisDatos', data, 'Datos guardados');
+    }
+    case 'sign-comp': {
+      readCf();
+      const cf = S.cf;
+      if (!cf.dni) return toast('Escribe tu DNI, NIE o pasaporte');
+      if (!['derechos', 'confidencialidad', 'gratuidad', 'datos'].every(k => cf.acepta && cf.acepta[k])) return toast('Marca las cuatro casillas para poder firmar');
+      if (normTxt(cf.firma) !== normTxt(cf.nombre)) return toast('Escribe tu nombre exactamente igual que arriba para firmar');
+      const r = await run('firmarCompromiso', cf, 'Compromiso firmado. Te hemos enviado una copia por correo.');
+      if (r) { S.cf = {}; S.resign = false; render.keepScroll = false; render(); }
+      return;
+    }
     case 'cancel-anul': S.anul = null; return render();
     case 'inv-send': {
       const lista = S.inv.map(x => ({ email: x.email, nombre: x.nombre, entidades: [x.ent] }));
@@ -744,12 +1010,17 @@ root.addEventListener('change', ev => {
     rd.readAsDataURL(f);
   }
   if (t.dataset.att) { t.checked ? S.att.sel.add(t.dataset.att) : S.att.sel.delete(t.dataset.att); }
-  if (t.id === 'attDate') S.att.date = t.value;
+  if (t.id === 'attDate') { S.att.date = t.value; render(); }
+  if (t.dataset.apuntar) run('apuntarTurno', { turno: t.dataset.apuntar, apuntar: t.checked }, t.checked ? 'Turno marcado como tuyo' : 'Turno desmarcado');
+  if (t.id === 'fFiles' && t.files.length) { uploadMedia(t.files); t.value = ''; }
+  if (t.id === 'fEnt') S.fent = t.value;
+  if (t.dataset.cacepta) { S.cf.acepta = S.cf.acepta || {}; S.cf.acepta[t.dataset.cacepta] = t.checked; }
   if (t.id === 'centSel') { S.cent = t.value; render(); }
   if (t.dataset.invent) { S.inv[+t.dataset.invent].ent = t.value; render(); }
   if (t.dataset.invnom) { S.inv[+t.dataset.invnom].nombre = t.value; }
 });
 root.addEventListener('input', ev => {
+  if (/^c(Nombre|Dni|Tel|Curso|Act|Firma)$/.test(ev.target.id)) readCf();
   if (ev.target.id === 'q') { S.q = ev.target.value; const pos = ev.target.selectionStart; render(); const q = $('q'); q.focus(); q.setSelectionRange(pos, pos); }
 });
 window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (D && VIEWS[h] && h !== S.view) go(h); });

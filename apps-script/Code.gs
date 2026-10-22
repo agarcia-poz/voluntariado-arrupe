@@ -22,6 +22,12 @@ const CONFIG = {
   FORM: 'https://docs.google.com/forms/d/1IE4z_QOV2n1IdxytTTrS6LG4bCb7vegyaJQ5AE4og9U/edit',
   // Horas de referencia para el certificado (se muestra como meta orientativa).
   HORAS_REFERENCIA: 20,
+  // Último día del curso: fin del compromiso y de los turnos semanales.
+  FIN_CURSO: '2027-06-30',
+  // Hora (Madrid) a la que salen los recordatorios del día siguiente.
+  HORA_RECORDATORIO: 10,
+  // Dirección /exec de esta aplicación web (para los botones de los recordatorios).
+  API_URL: 'https://script.google.com/macros/s/AKfycbzYykd0tdj1JUVWh91d3g7QRXMeiG6yZh_YlA1cP5EETIpUOBBSp0L6phpzLOhC1Eet/exec',
   REMITENTE: 'Voluntariado Arrupe · Pastoral CUSAFA'
 };
 
@@ -31,7 +37,7 @@ const TIPOS_DOC = {
 };
 
 const HOJAS = {
-  Usuarios: ['email', 'nombre', 'rol', 'estado', 'curso', 'coordEnts', 'alta'],
+  Usuarios: ['email', 'nombre', 'rol', 'estado', 'curso', 'coordEnts', 'alta', 'telefono', 'emailContacto', 'emergenciaNombre', 'emergenciaTelefono', 'avisos'],
   Entidades: ['id', 'nombre', 'lugar', 'etiqueta', 'color', 'descripcion', 'horario', 'cupo', 'ig', 'activa', 'claves'],
   Asignaciones: ['email', 'entidad', 'estado', 'fecha', 'origen'],
   Inscripciones: ['id', 'fecha', 'nombre', 'email', 'curso', 'preferencias', 'preferenciasTexto', 'motivo', 'estado', 'entidad', 'gestionadoPor'],
@@ -40,6 +46,12 @@ const HOJAS = {
   Noticias: ['id', 'fecha', 'titulo', 'detalle', 'tipo', 'autor'],
   Reflexiones: ['email', 'fecha', 'texto'],
   Registro: ['fecha', 'email', 'accion', 'detalle'],
+  Compromisos: ['email', 'nombre', 'dni', 'telefono', 'curso', 'entidades', 'actividades', 'desde', 'hasta', 'acepta', 'firma', 'fecha'],
+  Turnos: ['id', 'entidad', 'tipo', 'dia', 'fecha', 'inicio', 'fin', 'lugar', 'nota', 'activo', 'creadoPor', 'creado'],
+  Apuntados: ['turno', 'email', 'fecha'],
+  Confirmaciones: ['turno', 'fecha', 'email', 'respuesta', 'cuando'],
+  Recordatorios: ['turno', 'fecha', 'email', 'enviado'],
+  Multimedia: ['fileId', 'entidad', 'email', 'nombre', 'mime', 'fecha', 'descripcion', 'estado'],
   Invitaciones: ['codigo', 'email', 'nombre', 'rol', 'entidades', 'estado', 'creado', 'creadoPor', 'usadoPor', 'usadoEn']
 };
 
@@ -180,12 +192,15 @@ function matchEntidades_(txt) {
 }
 
 // ───────────────────────── API WEB ─────────────────────────
-function doGet() {
+function doGet(e) {
+  resetCache_();
+  const p = (e && e.parameter) || {};
+  if (p.r) return responderRecordatorio_(p);
   return json_({ ok: true, app: 'Voluntariado Arrupe', mensaje: 'API activa. La app se usa desde ' + CONFIG.APP_URL });
 }
 
 function doPost(e) {
-  Object.keys(_cache).forEach(k => delete _cache[k]);
+  resetCache_();
   try {
     const req = JSON.parse(e.postData.contents);
     const who = verify_(req.token);
@@ -457,6 +472,145 @@ const ACCIONES = {
     return bootstrap_(findUser_(me.email) || me);
   },
 
+  // ── mis datos ──
+  guardarMisDatos: (me, d) => {
+    const nombre = String(d.nombre || '').trim();
+    if (nombre.length < 3) throw httpErr_('Escribe tu nombre y apellidos');
+    const tel = String(d.telefono || '').trim();
+    if (tel && !/^[+\d][\d\s]{6,}$/.test(tel)) throw httpErr_('El teléfono no parece válido');
+    const ec = norm_(d.emailContacto);
+    if (ec && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(ec)) throw httpErr_('El correo de contacto no es válido');
+    withLock_(() => updateWhere_('Usuarios', u => u.email === me.email, {
+      nombre, curso: String(d.curso || '').trim(), telefono: txt_(tel), emailContacto: ec,
+      emergenciaNombre: String(d.emergenciaNombre || '').trim(), emergenciaTelefono: txt_(String(d.emergenciaTelefono || '').trim()),
+      avisos: d.avisos === false ? 'no' : 'sí'
+    }));
+    log_(me, 'guardarMisDatos', '');
+    return bootstrap_(findUser_(me.email));
+  },
+
+  // ── compromiso de voluntariado firmado en la app ──
+  firmarCompromiso: (me, d) => {
+    activo_(me);
+    const nombre = String(d.nombre || '').trim(), dni = String(d.dni || '').trim().toUpperCase().replace(/\s|-/g, '');
+    const tel = String(d.telefono || '').trim(), curso = String(d.curso || '').trim();
+    if (nombre.length < 5) throw httpErr_('Escribe tu nombre y apellidos completos');
+    if (!/^([0-9]{8}[A-Z]|[XYZ][0-9]{7}[A-Z]|[A-Z0-9]{6,12})$/.test(dni)) throw httpErr_('Revisa el DNI, NIE o pasaporte');
+    if (!/^[+\d][\d\s]{6,}$/.test(tel)) throw httpErr_('Indica un teléfono de contacto');
+    if (!curso) throw httpErr_('Indica tu grado y curso');
+    const acepta = d.acepta || {};
+    if (!['derechos', 'confidencialidad', 'gratuidad', 'datos'].every(k => acepta[k] === true)) throw httpErr_('Para firmar tienes que marcar las cuatro casillas');
+    const normN = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+    if (normN(d.firma) !== normN(nombre)) throw httpErr_('Para firmar, escribe tu nombre exactamente igual que arriba');
+    const ents = rows_('Asignaciones').filter(a => a.email === me.email && a.estado === 'activa').map(a => a.entidad);
+    if (!ents.length) throw httpErr_('Aún no tienes ningún voluntariado asignado');
+    const hoy = hoyISO_(0);
+    const rec = { email: me.email, nombre, dni: txt_(dni), telefono: txt_(tel), curso, entidades: ents.join(','), actividades: String(d.actividades || '').trim().slice(0, 1000),
+      desde: txt_(hoy), hasta: txt_(CONFIG.FIN_CURSO), acepta: 'derechos, confidencialidad, gratuidad, datos', firma: d.firma, fecha: new Date() };
+    withLock_(() => {
+      if (rows_('Compromisos').some(r => r.email === me.email)) updateWhere_('Compromisos', r => r.email === me.email, rec);
+      else append_('Compromisos', rec);
+      const docRec = { email: me.email, tipo: 'comp', estado: 'ok', fileId: '', archivo: 'Firmado en la app', fecha: new Date(), revisadoPor: 'firma electrónica', fechaRevision: new Date(), nota: '' };
+      if (rows_('Documentos').some(r => r.email === me.email && r.tipo === 'comp')) updateWhere_('Documentos', r => r.email === me.email && r.tipo === 'comp', docRec);
+      else append_('Documentos', docRec);
+      updateWhere_('Usuarios', u => u.email === me.email, { nombre, telefono: txt_(tel), curso });
+    });
+    mailCompromiso_(rec, ents);
+    log_(me, 'firmarCompromiso', ents.join(','));
+    return bootstrap_(findUser_(me.email));
+  },
+
+  // ── horarios ──
+  guardarTurno: (me, d) => {
+    const ent = entidad_(d.entidad);
+    puedeCoordinar_(me, ent.id);
+    const tipo = d.tipo === 'fecha' ? 'fecha' : 'semanal';
+    const hm = /^([01]\d|2[0-3]):[0-5]\d$/;
+    if (!hm.test(d.inicio) || !hm.test(d.fin) || d.fin <= d.inicio) throw httpErr_('Revisa la hora de inicio y de fin');
+    if (tipo === 'semanal' && !(Number(d.dia) >= 1 && Number(d.dia) <= 7)) throw httpErr_('Elige el día de la semana');
+    if (tipo === 'fecha' && !/^\d{4}-\d{2}-\d{2}$/.test(d.fecha || '')) throw httpErr_('Elige la fecha');
+    const rec = { id: d.id || Utilities.getUuid().slice(0, 8), entidad: ent.id, tipo, dia: tipo === 'semanal' ? Number(d.dia) : '', fecha: tipo === 'fecha' ? txt_(d.fecha) : '',
+      inicio: txt_(d.inicio), fin: txt_(d.fin), lugar: String(d.lugar || ent.lugar || '').trim(), nota: String(d.nota || '').trim(), activo: 'sí', creadoPor: me.email, creado: new Date() };
+    withLock_(() => {
+      if (d.id && rows_('Turnos').some(t => String(t.id) === String(d.id) && t.entidad === ent.id)) updateWhere_('Turnos', t => String(t.id) === String(d.id), rec);
+      else append_('Turnos', rec);
+    });
+    log_(me, 'guardarTurno', ent.id);
+    return bootstrap_(me);
+  },
+  borrarTurno: (me, d) => {
+    const t = rows_('Turnos').find(x => String(x.id) === String(d.id));
+    if (!t) throw httpErr_('Turno no encontrado');
+    puedeCoordinar_(me, t.entidad);
+    withLock_(() => updateWhere_('Turnos', x => String(x.id) === String(d.id), { activo: 'no' }));
+    return bootstrap_(me);
+  },
+  apuntarTurno: (me, d) => {
+    activo_(me);
+    const t = rows_('Turnos').find(x => String(x.id) === String(d.turno) && x.activo !== 'no');
+    if (!t) throw httpErr_('Turno no encontrado');
+    if (!rows_('Asignaciones').some(a => a.email === me.email && a.entidad === t.entidad && a.estado === 'activa')) throw httpErr_('No participas en esta entidad');
+    withLock_(() => {
+      deleteWhere_('Apuntados', a => String(a.turno) === String(t.id) && a.email === me.email);
+      if (d.apuntar) append_('Apuntados', { turno: t.id, email: me.email, fecha: new Date() });
+    });
+    return bootstrap_(me);
+  },
+  confirmarAsistencia: (me, d) => {
+    activo_(me);
+    const t = rows_('Turnos').find(x => String(x.id) === String(d.turno));
+    if (!t) throw httpErr_('Encuentro no encontrado');
+    if (!rows_('Asignaciones').some(a => a.email === me.email && a.entidad === t.entidad && a.estado === 'activa')) throw httpErr_('No participas en esta entidad');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(d.fecha || '') || d.fecha < hoyISO_(0)) throw httpErr_('Fecha no válida');
+    const resp = d.respuesta === 'no' ? 'no' : 'sí';
+    guardarConfirmacion_(t, d.fecha, me.email, resp);
+    if (resp === 'no') avisoAusencia_(t, d.fecha, me);
+    return bootstrap_(me);
+  },
+
+  // ── fotos y vídeos ──
+  subirMultimedia: (me, d) => {
+    activo_(me);
+    const ent = entidad_(d.entidad);
+    puedeSubirMedia_(me, ent.id);
+    if (d.permiso !== true) throw httpErr_('Confirma que no aparecen menores identificables y que tienes permiso de quienes salen');
+    if (!/^(image|video)\//.test(d.mime || '')) throw httpErr_('Solo se pueden subir fotos o vídeos');
+    const bytes = Utilities.base64Decode(d.base64);
+    if (bytes.length > 25 * 1024 * 1024) throw httpErr_('El archivo supera los 25 MB');
+    const folder = carpetaMedia_(ent);
+    const ext = (d.nombre || '').split('.').pop().slice(0, 5);
+    const nombre = Utilities.formatDate(new Date(), 'Europe/Madrid', 'yyyyMMdd-HHmmss') + '_' + me.email.split('@')[0] + '.' + ext;
+    const file = folder.createFile(Utilities.newBlob(bytes, d.mime, nombre));
+    if (d.descripcion) file.setDescription(String(d.descripcion).slice(0, 500));
+    withLock_(() => append_('Multimedia', { fileId: file.getId(), entidad: ent.id, email: me.email, nombre: d.nombre || nombre, mime: d.mime, fecha: new Date(), descripcion: String(d.descripcion || '').slice(0, 500), estado: 'activa' }));
+    log_(me, 'subirMultimedia', ent.id);
+    return { ok: true, misSubidas: rows_('Multimedia').filter(m => m.email === me.email && m.estado === 'activa').length };
+  },
+  galeria: (me, d) => {
+    const ent = entidad_(d.entidad);
+    if (me.rol !== 'pastoral' && splitList_(me.coordEnts).indexOf(ent.id) < 0) throw httpErr_('Solo la coordinación de la entidad ve la galería');
+    const users = {}; rows_('Usuarios').forEach(u => users[u.email] = u.nombre);
+    const items = rows_('Multimedia').filter(m => m.entidad === ent.id && m.estado === 'activa').reverse().slice(0, Number(d.max) || 36);
+    return {
+      entidad: ent.id,
+      carpetaUrl: me.rol === 'pastoral' ? carpetaMedia_(ent).getUrl() : '',
+      items: items.map(m => {
+        let thumb = '';
+        try { const b = DriveApp.getFileById(m.fileId).getThumbnail(); if (b) thumb = 'data:' + (b.getContentType() || 'image/png') + ';base64,' + Utilities.base64Encode(b.getBytes()); } catch (e) { }
+        return { id: m.fileId, mime: m.mime, fecha: iso_(m.fecha), autor: nombreCorto_(users[m.email] || m.email), descripcion: m.descripcion, thumb, url: me.rol === 'pastoral' ? 'https://drive.google.com/file/d/' + m.fileId + '/view' : '' };
+      })
+    };
+  },
+  quitarMultimedia: (me, d) => {
+    const m = rows_('Multimedia').find(x => x.fileId === d.id);
+    if (!m) throw httpErr_('Archivo no encontrado');
+    puedeCoordinar_(me, m.entidad);
+    try { DriveApp.getFileById(m.fileId).setTrashed(true); } catch (e) { }
+    withLock_(() => updateWhere_('Multimedia', x => x.fileId === d.id, { estado: 'retirada' }));
+    log_(me, 'quitarMultimedia', d.id);
+    return ACCIONES.galeria(me, { entidad: m.entidad });
+  },
+
   borrarNoticia: (me, d) => {
     pastoral_(me);
     withLock_(() => deleteWhere_('Noticias', n => String(n.id) === String(d.id)));
@@ -488,8 +642,9 @@ function bootstrap_(me) {
     .sort((a, b) => a.fecha < b.fecha ? -1 : 1);
 
   const out = {
-    me: { email: me.email, nombre: me.nombre, rol: me.rol, estado: me.estado, curso: me.curso, coordEnts: splitList_(me.coordEnts), foto: me.foto },
-    config: { horasReferencia: CONFIG.HORAS_REFERENCIA, tiposDoc: TIPOS_DOC },
+    me: { email: me.email, nombre: me.nombre, rol: me.rol, estado: me.estado, curso: me.curso, coordEnts: splitList_(me.coordEnts), foto: me.foto,
+      telefono: String(me.telefono || ''), emailContacto: me.emailContacto || '', emergenciaNombre: me.emergenciaNombre || '', emergenciaTelefono: String(me.emergenciaTelefono || ''), avisos: String(me.avisos) !== 'no' },
+    config: { horasReferencia: CONFIG.HORAS_REFERENCIA, tiposDoc: TIPOS_DOC, finCurso: CONFIG.FIN_CURSO, hoy: hoyISO_(0) },
     entidades, noticias
   };
 
@@ -500,6 +655,26 @@ function bootstrap_(me) {
     horas: asis.filter(a => a.email === me.email).map(a => ({ fecha: iso_(a.fecha), entidad: a.entidad, horas: Number(a.horas) })).sort((a, b) => a.fecha < b.fecha ? 1 : -1),
     reflexiones: rows_('Reflexiones').filter(r => r.email === me.email).map(r => ({ fecha: iso_(r.fecha), texto: r.texto })).reverse().slice(0, 20)
   };
+  const comp = rows_('Compromisos').find(r => r.email === me.email);
+  out.mio.compromiso = comp ? { nombre: comp.nombre, dni: String(comp.dni), telefono: String(comp.telefono), curso: comp.curso, entidades: splitList_(comp.entidades), actividades: comp.actividades, desde: iso_(comp.desde), hasta: iso_(comp.hasta), fecha: iso_(comp.fecha) } : null;
+  const turnos = rows_('Turnos').filter(t => t.activo !== 'no').map(turnoOut_);
+  const apuntados = rows_('Apuntados');
+  const confs = rows_('Confirmaciones');
+  const misEnts = asigs.filter(a => a.email === me.email && a.estado === 'activa').map(a => a.entidad);
+  const hoyS = hoyISO_(0), hasta14 = hoyISO_(14);
+  out.mio.turnos = turnos.filter(t => misEnts.indexOf(t.entidad) >= 0).map(t => Object.assign({}, t, { apuntado: apuntados.some(a => String(a.turno) === t.id && a.email === me.email) }));
+  out.mio.proximos = [];
+  out.mio.turnos.forEach(t => {
+    const conAp = apuntados.some(a => String(a.turno) === t.id);
+    if (t.tipo === 'semanal' && conAp && !t.apuntado) return;
+    ocurrencias_(t, hoyS, hasta14).forEach(f => {
+      const c = confs.find(x => String(x.turno) === t.id && iso_(x.fecha) === f && x.email === me.email);
+      out.mio.proximos.push({ turno: t.id, entidad: t.entidad, fecha: f, inicio: t.inicio, fin: t.fin, lugar: t.lugar, nota: t.nota, respuesta: c ? c.respuesta : '' });
+    });
+  });
+  out.mio.proximos.sort((a, b) => (a.fecha + a.inicio) < (b.fecha + b.inicio) ? -1 : 1);
+  out.mio.misSubidas = rows_('Multimedia').filter(m => m.email === me.email && m.estado === 'activa').length;
+  if (me.rol === 'pastoral') asegurarRecordatorios_();
 
   // Coordinación: solo sus entidades, y de los documentos solo el estado (nunca el archivo)
   const coordIds = me.rol === 'pastoral' ? [] : splitList_(me.coordEnts);
@@ -509,14 +684,25 @@ function bootstrap_(me) {
       const team = asigs.filter(a => a.entidad === id && a.estado === 'activa').map(a => byEmail[a.email]).filter(Boolean);
       out.coord[id] = {
         equipo: team.map(u => ({
-          email: u.email, nombre: u.nombre, curso: u.curso,
+          email: u.email, nombre: u.nombre, curso: u.curso, telefono: String(u.telefono || ''), emergencia: [u.emergenciaNombre, u.emergenciaTelefono].filter(String).join(' · '),
           otras: asigs.filter(a => a.email === u.email && a.estado === 'activa' && a.entidad !== id).map(a => a.entidad),
           cert: docState(u.email, 'cert'), comp: docState(u.email, 'comp'), horas: horasDe(u.email, id),
           coordina: splitList_(u.coordEnts).indexOf(id) >= 0,
           nuevo: asigs.some(a => a.email === u.email && a.entidad === id && a.estado === 'activa' && a.origen !== 'bienvenida enviada' && a.origen !== 'histórico' && !splitList_(u.coordEnts).length && daysAgo_(a.fecha) < 30)
         })),
-        sesiones: sesiones_(asis.filter(a => a.entidad === id), byEmail)
+        sesiones: sesiones_(asis.filter(a => a.entidad === id), byEmail),
+        turnos: turnos.filter(t => t.entidad === id).map(t => Object.assign({}, t, { apuntados: apuntados.filter(a => String(a.turno) === t.id).map(a => byEmail[a.email] ? nombreCorto_(byEmail[a.email].nombre) : a.email) })),
+        proximos: []
       };
+      turnos.filter(t => t.entidad === id).forEach(t => {
+        const tRow = { id: t.id, tipo: t.tipo };
+        const esperados = esperados_(tRow, team.filter(u => u.estado === 'activo'), apuntados);
+        ocurrencias_(t, hoyS, hasta14).forEach(f => out.coord[id].proximos.push({
+          turno: t.id, fecha: f, inicio: t.inicio, fin: t.fin, lugar: t.lugar,
+          personas: esperados.map(u => { const c = confs.find(x => String(x.turno) === t.id && iso_(x.fecha) === f && x.email === u.email); return { email: u.email, nombre: u.nombre, respuesta: c ? c.respuesta : '' }; })
+        }));
+      });
+      out.coord[id].proximos.sort((a, b) => (a.fecha + a.inicio) < (b.fecha + b.inicio) ? -1 : 1);
     });
   }
 
@@ -531,7 +717,9 @@ function bootstrap_(me) {
           o[t] = { estado: r ? r.estado : 'pend', url: r && r.fileId ? 'https://drive.google.com/file/d/' + r.fileId + '/view' : '', fecha: r ? iso_(r.fecha) : '' };
           return o;
         }, {}),
-        horas: horasDe(u.email)
+        horas: horasDe(u.email),
+        telefono: String(u.telefono || ''), emailContacto: u.emailContacto || '', emergencia: [u.emergenciaNombre, u.emergenciaTelefono].filter(String).join(' · '),
+        compromiso: (() => { const r = rows_('Compromisos').find(x => x.email === u.email); return r ? { dni: String(r.dni), fecha: iso_(r.fecha), hasta: iso_(r.hasta), actividades: r.actividades } : null; })()
       })),
       inscripciones: rows_('Inscripciones').map(r => ({
         id: String(r.id), fecha: iso_(r.fecha), nombre: r.nombre, email: r.email, curso: r.curso,
@@ -543,6 +731,7 @@ function bootstrap_(me) {
         creado: iso_(r.creado), usadoPor: r.usadoPor, usadoEn: iso_(r.usadoEn)
       })).reverse(),
       hojaUrl: SpreadsheetApp.openById(prop_('SHEET_ID')).getUrl(),
+      multimediaUrl: carpetaMediaRaiz_().getUrl(),
       carpetaUrl: DriveApp.getFolderById(prop_('FOLDER_ID')).getUrl()
     };
   }
@@ -608,6 +797,155 @@ function puedeCoordinar_(me, entId) {
   if (me.rol === 'pastoral') return;
   activo_(me);
   if (splitList_(me.coordEnts).indexOf(entId) < 0) throw httpErr_('No coordinas esta entidad');
+}
+
+// ───────────────────────── HORARIOS Y RECORDATORIOS ─────────────────────────
+const DIAS = ['', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado', 'domingo'];
+function hoyISO_(off) { return Utilities.formatDate(new Date(Date.now() + (off || 0) * 86400000), 'Europe/Madrid', 'yyyy-MM-dd'); }
+function diaSemana_(iso) { const d = new Date(iso + 'T12:00:00Z'); return ((d.getUTCDay() + 6) % 7) + 1; }
+function hhmm_(v) { if (v instanceof Date) return Utilities.formatDate(v, 'Europe/Madrid', 'HH:mm'); return String(v || '').replace(/^'/, '').slice(0, 5); }
+function turnoOut_(t) { return { id: String(t.id), entidad: t.entidad, tipo: t.tipo, dia: Number(t.dia) || 0, fecha: iso_(t.fecha), inicio: hhmm_(t.inicio), fin: hhmm_(t.fin), lugar: t.lugar, nota: t.nota }; }
+function ocurrencias_(t, desde, hasta) {
+  if (t.activo === 'no') return [];
+  if (t.tipo === 'fecha') { const f = iso_(t.fecha); return (f >= desde && f <= hasta) ? [f] : []; }
+  const out = []; let d = new Date(desde + 'T12:00:00Z'); const end = new Date(hasta + 'T12:00:00Z');
+  while (d <= end) { const iso = d.toISOString().slice(0, 10); if (diaSemana_(iso) === Number(t.dia) && iso <= CONFIG.FIN_CURSO) out.push(iso); d = new Date(d.getTime() + 86400000); }
+  return out;
+}
+// Quién está convocado: en fechas concretas, todo el equipo; en turnos semanales, quienes lo han elegido (o todo el equipo si nadie lo ha elegido aún)
+function esperados_(t, team, apuntados) {
+  if (t.tipo === 'fecha') return team;
+  const ap = (apuntados || rows_('Apuntados')).filter(a => String(a.turno) === String(t.id)).map(a => a.email);
+  return ap.length ? team.filter(u => ap.indexOf(u.email) >= 0) : team;
+}
+function guardarConfirmacion_(t, fecha, email, resp) {
+  withLock_(() => {
+    deleteWhere_('Confirmaciones', c => String(c.turno) === String(t.id) && iso_(c.fecha) === fecha && c.email === email);
+    append_('Confirmaciones', { turno: t.id, fecha: txt_(fecha), email, respuesta: resp, cuando: new Date() });
+  });
+}
+function avisoAusencia_(t, fecha, u) {
+  const ent = entidad_(t.entidad);
+  const coords = coordinadores_(ent.id).map(c => c.email);
+  mail_(coords.length ? coords : CONFIG.PASTORAL, (u.nombre || u.email) + ' no podrá ir · ' + ent.nombre,
+    `<p><b>${esc_(u.nombre || u.email)}</b> ha avisado de que <b>no podrá ir</b> al voluntariado de <b>${esc_(ent.nombre)}</b> el ${esc_(fechaLarga_(fecha))} (${esc_(hhmm_(t.inicio))}–${esc_(hhmm_(t.fin))}).</p><p>Puedes responder a este correo para escribirle.</p>`,
+    'Ver horarios', 'chorario', u.email);
+}
+function fechaLarga_(iso) {
+  const d = new Date(iso + 'T12:00:00Z');
+  const m = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  return DIAS[diaSemana_(iso)] + ' ' + d.getUTCDate() + ' de ' + m[d.getUTCMonth()];
+}
+function secreto_() { const p = PropertiesService.getScriptProperties(); let s = p.getProperty('SECRET'); if (!s) { s = Utilities.getUuid() + Utilities.getUuid(); p.setProperty('SECRET', s); } return s; }
+function firmaEnlace_(msg) { return Utilities.base64EncodeWebSafe(Utilities.computeHmacSha256Signature(msg, secreto_())).replace(/=+$/, '').slice(0, 24); }
+function enlaceRespuesta_(t, fecha, email, r) {
+  const base = CONFIG.API_URL || ScriptApp.getService().getUrl();
+  return base + '?r=' + r + '&t=' + encodeURIComponent(t.id) + '&f=' + fecha + '&u=' + encodeURIComponent(email) + '&s=' + firmaEnlace_([t.id, fecha, email, r].join('|'));
+}
+function responderRecordatorio_(p) {
+  try {
+    if (firmaEnlace_([p.t, p.f, norm_(p.u), p.r].join('|')) !== p.s) throw new Error('Este enlace no es válido.');
+    const t = rows_('Turnos').find(x => String(x.id) === String(p.t));
+    if (!t) throw new Error('Este encuentro ya no existe.');
+    if (p.f < hoyISO_(0)) throw new Error('Este encuentro ya ha pasado.');
+    const u = findUser_(p.u) || { email: norm_(p.u), nombre: p.u };
+    const ent = entidad_(t.entidad);
+    const resp = p.r === 'no' ? 'no' : 'sí';
+    guardarConfirmacion_(t, p.f, u.email, resp);
+    if (resp === 'no') avisoAusencia_(t, p.f, u);
+    return pagina_(resp === 'sí' ? '¡Gracias por confirmar!' : 'Gracias por avisar',
+      resp === 'sí' ? `Te esperamos el ${fechaLarga_(p.f)} a las ${hhmm_(t.inicio)} en ${ent.nombre}.` : `Hemos avisado a la coordinación de ${ent.nombre}. Si cambias de idea, vuelve a abrir el correo y pulsa “Confirmo asistencia”.`);
+  } catch (err) { return pagina_('No se ha podido registrar', err.message); }
+}
+function pagina_(titulo, texto) {
+  const html = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${esc_(titulo)}</title></head>
+  <body style="margin:0;font-family:Arial,sans-serif;background:#F5F8FB;color:#152433;display:grid;place-items:center;min-height:100vh">
+  <div style="max-width:440px;margin:24px;background:#fff;border:1px solid #D9E3EC;border-radius:18px;padding:28px;text-align:center">
+  <div style="height:6px;border-radius:6px;background:linear-gradient(90deg,#E58A00,#D9007A,#3A2A85,#8E5A32,#12679A,#D9312B,#55595D,#25995A);margin-bottom:18px"></div>
+  <h1 style="font-size:22px;margin:0 0 10px">${esc_(titulo)}</h1><p style="line-height:1.5;margin:0 0 20px">${esc_(texto)}</p>
+  <a href="${CONFIG.APP_URL}" style="display:inline-block;background:#12679A;color:#fff;padding:11px 18px;border-radius:10px;text-decoration:none;font-weight:600">Abrir la app</a></div></body></html>`;
+  return HtmlService.createHtmlOutput(html).setTitle(titulo).addMetaTag('viewport', 'width=device-width, initial-scale=1');
+}
+/** Se ejecuta cada día (lo instala la app sola). Envía el recordatorio de los encuentros de mañana. */
+function enviarRecordatorios() {
+  resetCache_();
+  const man = hoyISO_(1);
+  const ya = new Set(rows_('Recordatorios').map(r => String(r.turno) + '|' + iso_(r.fecha) + '|' + r.email));
+  const apuntados = rows_('Apuntados');
+  rows_('Turnos').filter(t => t.activo !== 'no').forEach(t => {
+    if (!ocurrencias_(t, man, man).length) return;
+    let ent; try { ent = entidad_(t.entidad); } catch (e) { return; }
+    const team = equipo_(t.entidad).filter(u => u.estado === 'activo' && String(u.avisos) !== 'no');
+    esperados_(t, team, apuntados).forEach(u => {
+      const k = String(t.id) + '|' + man + '|' + u.email;
+      if (ya.has(k)) return;
+      mailRecordatorio_(t, ent, man, u);
+      append_('Recordatorios', { turno: t.id, fecha: txt_(man), email: u.email, enviado: new Date() });
+    });
+  });
+}
+function mailRecordatorio_(t, ent, fecha, u) {
+  const coords = coordinadores_(ent.id).map(c => c.email);
+  const si = enlaceRespuesta_(t, fecha, u.email, 'si'), no = enlaceRespuesta_(t, fecha, u.email, 'no');
+  const asunto = 'Mañana tienes voluntariado · ' + ent.nombre + ' · ' + hhmm_(t.inicio);
+  const mailto = 'mailto:' + coords.join(',') + '?subject=' + encodeURIComponent('Voluntariado ' + ent.nombre + ' · ' + fechaLarga_(fecha));
+  const btn = (href, txt, bg, fg) => `<a href="${href}" style="display:inline-block;margin:4px 6px 4px 0;background:${bg};color:${fg};padding:11px 16px;border-radius:10px;text-decoration:none;font-weight:600">${txt}</a>`;
+  mail_([u.email], asunto,
+    `<p>Hola, ${esc_(String(u.nombre || '').split(' ')[0])}:</p>
+     <p>Te recordamos que mañana, <b>${esc_(fechaLarga_(fecha))}</b>, tienes voluntariado en <b>${esc_(ent.nombre)}</b>.</p>
+     <p><b>Horario:</b> ${esc_(hhmm_(t.inicio))}–${esc_(hhmm_(t.fin))}<br><b>Lugar:</b> ${esc_(t.lugar || ent.lugar)}${t.nota ? '<br><b>Nota:</b> ' + esc_(t.nota) : ''}</p>
+     <p style="margin:20px 0 8px">${btn(si, 'Confirmo asistencia', '#25995A', '#fff')}${btn(no, 'No podré ir', '#EEF3F8', '#152433')}</p>
+     ${coords.length ? `<p style="font-size:14px">¿Algún problema? <a href="${mailto}" style="color:#12679A;font-weight:600">Escribe a tu coordinación</a>.</p>` : ''}
+     <p style="font-size:12px;color:#6E8193">Puedes desactivar estos recordatorios en la app, en Mis datos.</p>`,
+    null, null, coords[0] || '');
+}
+function asegurarRecordatorios_() {
+  const p = PropertiesService.getScriptProperties();
+  if (p.getProperty('TRIG_REC') === '1') return;
+  try {
+    if (!ScriptApp.getProjectTriggers().some(t => t.getHandlerFunction() === 'enviarRecordatorios'))
+      ScriptApp.newTrigger('enviarRecordatorios').timeBased().everyDays(1).atHour(CONFIG.HORA_RECORDATORIO).inTimezone('Europe/Madrid').create();
+    p.setProperty('TRIG_REC', '1');
+  } catch (e) { Logger.log('No se pudo instalar el recordatorio diario: ' + e); }
+}
+/** Por si quieres instalar a mano el envío diario de recordatorios. */
+function instalarRecordatorios() { PropertiesService.getScriptProperties().deleteProperty('TRIG_REC'); asegurarRecordatorios_(); Logger.log('Recordatorio diario instalado a las ' + CONFIG.HORA_RECORDATORIO + ':00'); }
+
+// ───────────────────────── COMPROMISO ─────────────────────────
+function mailCompromiso_(rec, ents) {
+  const nombres = ents.map(id => { const e = entidad_(id); return `<li><b>${esc_(e.nombre)}</b> · ${esc_(e.lugar)} · ${esc_(e.horario)}</li>`; }).join('');
+  mail_([rec.email], 'Tu compromiso de voluntariado firmado',
+    `<p>Hola, ${esc_(rec.nombre.split(' ')[0])}:</p><p>Hemos recibido tu <b>compromiso de voluntariado</b> firmado en la app. Te dejamos una copia.</p>
+     <div style="border:1px solid #D9E3EC;border-radius:12px;padding:14px 16px;font-size:14px">
+     <p style="margin:0 0 8px"><b>Entre</b> el centro SAFA-Úbeda (Fundación Escuelas Profesionales de la Sagrada Familia, CIF G23633266, Avda. de Cristo Rey, 25, 23400 Úbeda) <b>y</b> ${esc_(rec.nombre)}, con documento ${esc_(String(rec.dni).replace(/^'/, ''))}.</p>
+     <p style="margin:0 0 6px"><b>Voluntariado en:</b></p><ul style="margin:0 0 8px">${nombres}</ul>
+     ${rec.actividades ? `<p style="margin:0 0 8px"><b>Actividades:</b> ${esc_(rec.actividades)}</p>` : ''}
+     <p style="margin:0 0 8px"><b>Vigencia:</b> desde el ${esc_(fechaLarga_(String(rec.desde).replace(/^'/, '')))} hasta el ${esc_(fechaLarga_(CONFIG.FIN_CURSO))}.</p>
+     <p style="margin:0"><b>Aceptado:</b> derechos y obligaciones de la persona voluntaria y de la entidad, confidencialidad, carácter gratuito y tratamiento de datos. <b>Firma:</b> ${esc_(rec.firma)} · ${esc_(Utilities.formatDate(rec.fecha, 'Europe/Madrid', 'dd/MM/yyyy HH:mm'))}</p></div>
+     <p>Puedes dejar este compromiso cuando quieras, avisando con al menos 15 días de antelación.</p>`,
+    'Abrir la app', 'docs');
+}
+
+// ───────────────────────── MULTIMEDIA ─────────────────────────
+function carpetaMediaRaiz_() {
+  const p = PropertiesService.getScriptProperties();
+  const id = p.getProperty('MEDIA_ID');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { } }
+  const f = DriveApp.createFolder('Voluntariado Arrupe · Fotos y vídeos');
+  f.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+  const owner = norm_(Session.getEffectiveUser().getEmail());
+  CONFIG.PASTORAL.map(norm_).filter(e => e !== owner && e.indexOf('@') > 0 && e.indexOf('correo_de') !== 0).forEach(e => { try { f.addEditor(e); } catch (x) { } });
+  p.setProperty('MEDIA_ID', f.getId());
+  return f;
+}
+function carpetaMedia_(ent) {
+  const root = carpetaMediaRaiz_();
+  const it = root.getFoldersByName(ent.nombre);
+  return it.hasNext() ? it.next() : root.createFolder(ent.nombre);
+}
+function puedeSubirMedia_(me, entId) {
+  if (me.rol === 'pastoral' || splitList_(me.coordEnts).indexOf(entId) >= 0) return;
+  if (!rows_('Asignaciones').some(a => a.email === me.email && a.entidad === entId && a.estado === 'activa')) throw httpErr_('Solo puedes subir fotos de tus voluntariados');
 }
 
 // ───────────────────────── INVITACIONES ─────────────────────────
@@ -677,7 +1015,8 @@ function avisarAsignacion_(email, nombre, ent) {
     'Ver mi equipo', 'cinicio');
 }
 
-let _ss = null; const _cache = {};
+let _ss = null; const _cache = {}; const _headOk = {};
+function resetCache_() { Object.keys(_cache).forEach(k => delete _cache[k]); Object.keys(_headOk).forEach(k => delete _headOk[k]); }
 function ss_() { return _ss || (_ss = SpreadsheetApp.openById(prop_('SHEET_ID'))); }
 function prop_(k) { const v = PropertiesService.getScriptProperties().getProperty(k); if (!v) throw new Error('Falta ejecutar setup()'); return v; }
 function sheet_(name) {
@@ -688,6 +1027,13 @@ function sheet_(name) {
     s.setFrozenRows(1);
   }
   if (!s) throw new Error('Falta la hoja ' + name + '. Ejecuta setup().');
+  if (HOJAS[name] && !_headOk[name]) { // añade columnas nuevas al final si la hoja es de una versión anterior
+    const w = HOJAS[name].length, lc = Math.max(1, s.getLastColumn());
+    const cur = s.getRange(1, 1, 1, Math.max(w, lc)).getValues()[0];
+    if (HOJAS[name].some((h, i) => cur[i] !== h) && cur.slice(0, lc).every((h, i) => h === '' || h === HOJAS[name][i]))
+      s.getRange(1, 1, 1, w).setValues([HOJAS[name]]).setFontWeight('bold').setBackground('#E3F0F8');
+    _headOk[name] = true;
+  }
   return s;
 }
 function rows_(name) {
@@ -733,6 +1079,7 @@ function deleteWhere_(name, pred) {
   }
   delete _cache[name];
 }
+function txt_(v) { v = String(v == null ? '' : v); return v ? "'" + v.replace(/^'/, '') : ''; }
 function safeCell_(v) { return (typeof v === 'string' && /^[=+\-@]/.test(v)) ? "'" + v : v; }
 function withLock_(fn) { const l = LockService.getScriptLock(); l.waitLock(20000); try { return fn(); } finally { l.releaseLock(); } }
 function log_(me, accion, detalle) { try { append_('Registro', { fecha: new Date(), email: me.email, accion, detalle }); } catch (e) { } }

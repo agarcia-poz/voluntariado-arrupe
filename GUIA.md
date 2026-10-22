@@ -127,3 +127,13 @@ Las entidades marcadas se reconocen por su nombre o por las **palabras clave** q
   - un plazo de conservación, por ejemplo borrar la carpeta de documentos al cerrar cada curso;
   - una cláusula informativa en el formulario de inscripción.
 - La pestaña *Registro* guarda quién hizo cada cambio y cuándo.
+
+## Novedades: compromiso, horarios, recordatorios y fotos
+
+- **Compromiso de voluntariado:** ya no se sube como archivo. Cada persona lo completa y lo firma en la app (Documentos → Completar y firmar) y recibe una copia por correo. Los datos quedan en la pestaña *Compromisos* de la hoja, que solo veis vosotros.
+- **Mis datos:** cada persona mantiene su teléfono, un correo alternativo y un contacto de emergencia. La coordinación ve el teléfono y el contacto de emergencia de su equipo.
+- **Horarios:** la coordinación fija turnos semanales o fechas concretas en *Horarios*. El voluntariado los ve en *Mi horario*, marca su turno y puede añadirlo a Google Calendar.
+- **Recordatorios:** cada día a las 10:00 sale un correo a quien tiene voluntariado al día siguiente, con botones para confirmar o avisar de que no puede, y un enlace para escribir a la coordinación. El envío diario se instala solo la primera vez que Pastoral entra en la app tras actualizar el script. Si quieres instalarlo a mano, ejecuta `instalarRecordatorios()`.
+- **Fotos y vídeos:** voluntariado y coordinación pueden subirlos (con aviso sobre menores identificables). Se guardan en la carpeta privada *Voluntariado Arrupe · Fotos y vídeos*, ordenados por entidad, y la coordinación los ve en *Mi entidad*.
+
+Las hojas nuevas se crean solas. Al actualizar `Code.gs`, revisa que `CONFIG.API_URL` sea la dirección `/exec` de tu aplicación web y que `CONFIG.FIN_CURSO` sea el último día del curso.
