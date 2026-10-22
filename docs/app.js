@@ -48,6 +48,8 @@ try {
   if (c) { sessionStorage.setItem('arrupe-code', c); u.searchParams.delete('codigo'); history.replaceState(null, '', u.pathname + u.search + u.hash); }
   CODE = sessionStorage.getItem('arrupe-code');
 } catch (e) { }
+let DEMO_START = null;
+try { const q = new URL(location.href).searchParams.get('demo'); if (q === 'coord' || q === 'vol') DEMO_START = q; } catch (e) { }
 function clearCode() { CODE = null; try { sessionStorage.removeItem('arrupe-code'); } catch (e) { } }
 
 /* ───────── utilidades ───────── */
@@ -64,8 +66,93 @@ const nf = n => (Math.round(n * 10) / 10).toLocaleString('es-ES');
 function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 3200); }
 function jwtExp(t) { try { return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).exp * 1000; } catch (e) { return 0; } }
 
+/* ───────── MODO DEMOSTRACIÓN (datos ficticios, no se guarda nada) ───────── */
+let DEMO = null;
+const dIso = n => { const d = new Date(); d.setDate(d.getDate() + n); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
+const DEMO_ENTS = [
+  ['res', 'Residencia de Ancianos', 'Plaza del Marqués, Úbeda', 'Mayores', 'orange', 'Acompañar a personas mayores: conversación, juegos de mesa, lectura y paseos. Lo que más se agradece es la constancia y el tiempo sin prisa.', 'Lunes a viernes, 17:00–18:00 o 18:00–19:00. Cada voluntario elige su día.', 8, 'https://www.instagram.com/reel/DR4YgsLjO-k/', ['Pablo R.', 'Yolanda T.'], 5],
+  ['cruz', 'Cruz Roja Úbeda', 'Asamblea local de Úbeda', 'Acción social', 'red', 'Colaboración en los programas de la asamblea local: atención a familias, recogidas y campañas puntuales.', 'Según el programa y la campaña.', 6, '', ['Yolanda T.'], 1],
+  ['hogar', 'Escuela Hogar SAFA', 'SAFA Úbeda', 'Infancia', 'magenta', 'Apoyo a niñas y niños residentes en las tareas escolares y en el tiempo libre. Un lugar donde se aprende mucho de lo que significa educar.', 'Lunes a jueves, 16:00–17:00, 18:00–19:00 o 19:00–20:00.', 14, 'https://www.instagram.com/reel/DR32RdJjP5_/', ['Clara O.', 'Miguel Á.'], 6],
+  ['down', 'Asociación Síndrome de Down', 'Úbeda', 'Diversidad', 'purple', 'Actividades de ocio, habilidades sociales y autonomía con jóvenes y adultos con síndrome de Down.', 'Varias tardes por semana, en sesiones de 2–3 horas.', 10, 'https://www.instagram.com/reel/DR4K1s_DA8h/', ['Ana S.', 'Paula S.'], 7],
+  ['alz', 'Asociación Alzheimer', 'Úbeda', 'Mayores', 'brown', 'Acompañamiento y estimulación de personas con alzhéimer, junto a sus familias y al equipo técnico.', 'Lunes, 1 hora.', 4, 'https://www.instagram.com/reel/DR4EANoDHAM/', ['M.ª Teresa A.'], 2],
+  ['ute', 'Centro Penitenciario de Jaén (UTE)', 'Jaén', 'Prisión', 'grey', 'Encuentros y talleres en la Unidad Terapéutica y Educativa. Una experiencia exigente que cambia la mirada sobre las segundas oportunidades.', 'Calendario de sesiones fijado con el centro.', 16, 'https://www.instagram.com/reel/DR4np6Wl5de/', ['Marina H.', 'Antonio P.'], 11],
+  ['apoyo', 'Apoyo Escolar SAFA Úbeda', 'EE.PP. SAFA Úbeda', 'Infancia', 'blue', 'Refuerzo escolar a alumnado de Primaria. Tu primera aula real, acompañando a quien más lo necesita.', 'L 16–18 h · M 16–17 h · X 16–17 h · J 16–18 h.', 14, 'https://www.instagram.com/reel/DR4fdeyjAAf/', ['M.ª Jesús P.', 'M.ª Victoria C.'], 9],
+  ['ilu', 'Proyecto Ilusión Baeza', 'Baeza', 'Infancia', 'green', 'Tardes de ocio educativo con menores. Juego, convivencia y mucha energía.', '1–2 sábados al mes, 17:00–21:00.', 12, 'https://www.instagram.com/reel/DR4RtaHjM3N/', ['Gustavo P.', 'María R.'], 8],
+  ['apro', 'APROMPSI Úbeda', 'Úbeda', 'Diversidad', 'teal', 'Actividades con personas con discapacidad intelectual: fútbol, zumba, teatro y baile.', 'Jueves: fútbol 16–18 h · zumba 17–18 h · teatro y baile 18–20 h.', 8, 'https://www.instagram.com/reel/DR39H0eDBh8/', ['Lorena P.', 'Ramón S.'], 5]
+].map(e => ({ id: e[0], nombre: e[1], lugar: e[2], etiqueta: e[3], color: e[4], descripcion: e[5], horario: e[6], cupo: e[7], ig: e[8], activa: true, coordinadores: e[9], ocupadas: e[10] }));
+function demoData(role) {
+  const base = {
+    config: { horasReferencia: 20, tiposDoc: { cert: 'Certificado de delitos de naturaleza sexual', comp: 'Compromiso de voluntariado' } },
+    entidades: JSON.parse(JSON.stringify(DEMO_ENTS)),
+    noticias: [
+      { id: 'n1', fecha: dIso(6), titulo: 'Encuentro de inicio del Voluntariado Arrupe', detalle: 'Capilla del Centro Universitario · 13:30', tipo: 'Encuentro' },
+      { id: 'n2', fecha: dIso(13), titulo: 'Formación: acompañar con cuidado a cada persona', detalle: 'Aula 2.4 · 13:30 · para quienes empiezan', tipo: 'Formación' },
+      { id: 'n3', fecha: dIso(15), titulo: 'Fin del plazo para entregar la documentación', detalle: 'Certificado de delitos de naturaleza sexual y compromiso de voluntariado', tipo: 'Aviso' },
+      { id: 'n4', fecha: dIso(28), titulo: 'Oración del voluntariado', detalle: 'Último jueves de mes · Capilla · durante el recreo', tipo: 'Oración' }
+    ]
+  };
+  if (role === 'coord') {
+    const equipo = [
+      ['clara.ortega@cusafa.es', 'Clara Ortega Vílchez', '4.º Ed. Infantil', [], 'ok', 'ok', 14, true, false],
+      ['lucia.martos@cusafa.es', 'Lucía Martos Ortega', '2.º Ed. Infantil', ['apoyo'], 'ok', 'rev', 9, false, false],
+      ['javier.cuesta@cusafa.es', 'Javier Cuesta Ruiz', '1.º Ed. Primaria', [], 'rev', 'ok', 4, false, false],
+      ['carmen.vilches@cusafa.es', 'Carmen Vilches Ramos', '3.º Ed. Primaria', ['ute'], 'ok', 'ok', 11, false, false],
+      ['alba.torres@cusafa.es', 'Alba Torres Medina', '1.º Ed. Infantil', [], 'pend', 'pend', 0, false, true],
+      ['marta.jimenez@cusafa.es', 'Marta Jiménez Soto', '1.º Ed. Infantil', ['res'], 'ok', 'pend', 3, false, false]
+    ].map(x => ({ email: x[0], nombre: x[1], curso: x[2], otras: x[3], cert: x[4], comp: x[5], horas: x[6], coordina: x[7], nuevo: x[8] }));
+    return Object.assign(base, {
+      me: { email: 'clara.ortega@cusafa.es', nombre: 'Clara Ortega Vílchez', rol: 'coord', estado: 'activo', curso: '4.º Ed. Infantil', coordEnts: ['hogar'], foto: '' },
+      mio: { asignaciones: [{ entidad: 'hogar', estado: 'activa' }], docs: { cert: { estado: 'ok', fecha: dIso(-14), nota: '' }, comp: { estado: 'ok', fecha: dIso(-14), nota: '' } },
+        horas: [{ fecha: dIso(-2), entidad: 'hogar', horas: 2 }, { fecha: dIso(-7), entidad: 'hogar', horas: 2 }, { fecha: dIso(-9), entidad: 'hogar', horas: 1 }], reflexiones: [] },
+      coord: { hogar: { equipo, sesiones: [
+        { sesion: 's1', fecha: dIso(-2), entidad: 'hogar', horas: 2, personas: ['Clara O.', 'Lucía M.', 'Carmen V.', 'Marta J.'] },
+        { sesion: 's2', fecha: dIso(-7), entidad: 'hogar', horas: 2, personas: ['Clara O.', 'Lucía M.', 'Javier C.', 'Carmen V.'] },
+        { sesion: 's3', fecha: dIso(-9), entidad: 'hogar', horas: 1, personas: ['Clara O.', 'Lucía M.', 'Carmen V.'] }] } }
+    });
+  }
+  return Object.assign(base, {
+    me: { email: 'lucia.martos@cusafa.es', nombre: 'Lucía Martos Ortega', rol: 'vol', estado: 'activo', curso: '2.º Ed. Infantil', coordEnts: [], foto: '' },
+    mio: { asignaciones: [{ entidad: 'hogar', estado: 'activa' }, { entidad: 'apoyo', estado: 'activa' }],
+      docs: { cert: { estado: 'ok', fecha: dIso(-12), nota: '' }, comp: { estado: 'pend', fecha: '', nota: '' } },
+      horas: [{ fecha: dIso(-2), entidad: 'hogar', horas: 2 }, { fecha: dIso(-6), entidad: 'apoyo', horas: 2 }, { fecha: dIso(-7), entidad: 'hogar', horas: 2 }, { fecha: dIso(-9), entidad: 'hogar', horas: 1 }, { fecha: dIso(-13), entidad: 'apoyo', horas: 2 }, { fecha: dIso(-16), entidad: 'hogar', horas: 2 }, { fecha: dIso(-20), entidad: 'apoyo', horas: 2 }],
+      reflexiones: [{ fecha: dIso(-7), texto: 'Hoy Aitana me ha enseñado su cuaderno de dibujos. No sabía que llevaba semanas esperando a que se lo pidiera.' }] }
+  });
+}
+function demoApi(action, d) {
+  const D2 = DEMO, me = D2.me, short = n => { const p = n.split(' '); return p[0] + ' ' + p[1][0] + '.'; };
+  switch (action) {
+    case 'bootstrap': return D2;
+    case 'guardarReflexion': D2.mio.reflexiones.unshift({ fecha: todayISO(), texto: d.texto }); return D2;
+    case 'subirDocumento': D2.mio.docs[d.tipo] = { estado: 'rev', fecha: todayISO(), nota: '' }; return D2;
+    case 'solicitarEntidad': D2.mio.asignaciones.push({ entidad: d.entidad, estado: 'solicitada' }); return D2;
+    case 'dejarEntidad': D2.mio.asignaciones = D2.mio.asignaciones.filter(x => x.entidad !== d.entidad); return D2;
+    case 'registrarSesion': {
+      const C = D2.coord[d.entidad];
+      const ps = C.equipo.filter(p => d.emails.includes(p.email));
+      ps.forEach(p => p.horas += d.horas);
+      C.sesiones.unshift({ sesion: 's' + Date.now(), fecha: d.fecha, entidad: d.entidad, horas: d.horas, personas: ps.map(p => short(p.nombre)) });
+      if (d.emails.includes(me.email)) D2.mio.horas.unshift({ fecha: d.fecha, entidad: d.entidad, horas: d.horas });
+      return D2;
+    }
+    case 'borrarSesion': Object.values(D2.coord).forEach(C => { C.sesiones = C.sesiones.filter(s => s.sesion !== d.sesion); }); return D2;
+    case 'recordarDocumentos': return { enviados: D2.coord[d.entidad].equipo.filter(p => p.cert !== 'ok' || p.comp !== 'ok').length };
+    case 'darBienvenida': D2.coord[d.entidad].equipo.forEach(p => { if (p.email === d.email) p.nuevo = false; }); return D2;
+    default: throw new Error('En el modo demostración esta acción no está disponible');
+  }
+}
+function startDemo(role) {
+  DEMO = demoData(role); D = DEMO;
+  S.view = null; S.ent = null; S.cent = null; S.att = null; S.leaving = null;
+  render.keepScroll = false; render(); window.scrollTo(0, 0);
+}
+async function exitDemo() {
+  DEMO = null; D = null; S.view = null;
+  if (TOKEN && jwtExp(TOKEN) > Date.now() + 30000) load(); else render();
+}
+
 /* ───────── API ───────── */
 async function api(action, data) {
+  if (DEMO) { await new Promise(r => setTimeout(r, 250)); return demoApi(action, data || {}); }
   if (!TOKEN || jwtExp(TOKEN) < Date.now() + 30000) { signOut(true); throw new Error('Tu sesión ha caducado. Vuelve a entrar.'); }
   let res;
   try {
@@ -81,7 +168,7 @@ async function run(action, data, okMsg) {
   try {
     const r = await api(action, data);
     if (r && r.me) D = r;
-    if (okMsg) toast(typeof okMsg === 'function' ? okMsg(r) : okMsg);
+    if (okMsg) toast((typeof okMsg === 'function' ? okMsg(r) : okMsg) + (DEMO ? ' (demostración: no se guarda ni se envía nada)' : ''));
     render();
     return r;
   } catch (e) { toast(e.message); return null; }
@@ -119,6 +206,7 @@ function signOut(silent, msg) {
 function initGoogle(tries = 0) {
   if (!window.google || !google.accounts) { if (tries < 60) return setTimeout(() => initGoogle(tries + 1), 150); S.err = 'No se pudo cargar el acceso de Google. Recarga la página.'; return render(); }
   google.accounts.id.initialize({ client_id: CFG.CLIENT_ID, callback: onCredential, auto_select: true, cancel_on_tap_outside: false, use_fedcm_for_prompt: true });
+  if (DEMO) return;
   if (TOKEN && jwtExp(TOKEN) > Date.now() + 60000) load(); else { TOKEN = null; render(); try { google.accounts.id.prompt(); } catch (e) { } }
 }
 
@@ -168,6 +256,7 @@ function vLogin() {
     ${ok ? '<div class="gbtn-host" id="gbtn"></div>' : `<p class="err">${!apiOk ? 'La dirección del script en config.js no es válida: debe empezar por https://script.google.com/ y acabar en /exec.' : 'El ID de cliente de Google en config.js no es válido.'}</p>`}
     ${S.err ? `<p class="err">${esc(S.err)}</p>` : ''}
     ${CODE ? `<div class="note">${ic('mail', 18)}<span>Tienes una <b>invitación para coordinar</b>. Entra con tu cuenta de Google y se activará al momento.</span></div>` : ''}
+    <button class="signout" data-demo="vol" style="justify-self:center">Ver una demostración de la app</button>
     <div class="login-note">${ic('lock', 18)}<span>La primera vez, el Servicio de Pastoral revisa tu cuenta antes de darte acceso. Tus documentos solo los ve Pastoral.</span></div>
   </div></main>`;
 }
@@ -179,7 +268,9 @@ function shell(content) {
   const sub = c.isP ? 'Servicio de Pastoral' : c.isC ? 'Coordinación · ' + c.coordIds.map(id => E(id).nombre).join(', ') : c.pend ? 'Cuenta pendiente' : 'Voluntario/a' + (me.curso ? ' · ' + me.curso : '');
   const items = n.map(([k, l, i]) => { const b = badge(k); return `<button data-go="${k}" ${S.view === k ? 'aria-current="page"' : ''}>${ic(i)}<span>${l}</span>${b ? `<span class="count">${b}</span>` : ''}</button>`; }).join('');
   const tabs = n.map(([k, l]) => { const b = badge(k); return `<button data-go="${k}" ${S.view === k ? 'aria-current="page"' : ''}>${l}${b ? ` (${b})` : ''}</button>`; }).join('');
-  return `<div class="mtop"><div class="row"><div class="logo-wrap"><img src="${LOGO}" alt="Pastoral CUSAFA"></div><div style="display:flex;gap:10px;align-items:center"><button class="signout" data-act="signout">Salir</button>${avatar(me, 'var(--brand)')}</div></div><nav class="tabs" aria-label="Secciones">${tabs}</nav></div>
+  const demoBar = DEMO ? `<div class="demo-bar" role="region" aria-label="Modo demostración"><span><b>Modo demostración</b> · datos ficticios, no se guarda nada</span>
+    <div class="seg"><button data-demo="coord" aria-pressed="${DEMO.me.rol === 'coord'}">Coordinación</button><button data-demo="vol" aria-pressed="${DEMO.me.rol === 'vol'}">Voluntariado</button><button data-act="demo-exit">Salir</button></div></div>` : '';
+  return demoBar + `<div class="mtop"><div class="row"><div class="logo-wrap"><img src="${LOGO}" alt="Pastoral CUSAFA"></div><div style="display:flex;gap:10px;align-items:center"><button class="signout" data-act="signout">Salir</button>${avatar(me, 'var(--brand)')}</div></div><nav class="tabs" aria-label="Secciones">${tabs}</nav></div>
   <div class="shell">
     <aside class="side"><div class="logo-wrap"><img src="${LOGO}" alt="Pastoral · Centro Universitario Sagrada Familia"></div>
       <div class="motto">Voluntariado Arrupe</div>
@@ -349,7 +440,7 @@ function vPanel() {
   const multi = act.filter(p => p.asignaciones.filter(a => a.estado === 'activa').length > 1).length;
   const nIns = D.pastoral.inscripciones.filter(i => i.estado === 'nueva').length;
   const pp = pendientesPastoral();
-  return header('Servicio de Pastoral', 'Panel del Voluntariado Arrupe', 'Lo que necesita una mirada vuestra hoy.', `<a class="btn ghost" href="${safeUrl(D.pastoral.hojaUrl)}" target="_blank" rel="noopener">${ic('ext', 18)}Hoja de datos</a><a class="btn ghost" href="${safeUrl(D.pastoral.carpetaUrl)}" target="_blank" rel="noopener">${ic('lock', 18)}Carpeta de documentos</a>`) +
+  return header('Servicio de Pastoral', 'Panel del Voluntariado Arrupe', 'Lo que necesita una mirada vuestra hoy.', `<button class="btn primary" data-demo="coord">${ic('users', 18)}Ver demostración</button><a class="btn ghost" href="${safeUrl(D.pastoral.hojaUrl)}" target="_blank" rel="noopener">${ic('ext', 18)}Hoja de datos</a><a class="btn ghost" href="${safeUrl(D.pastoral.carpetaUrl)}" target="_blank" rel="noopener">${ic('lock', 18)}Carpeta de documentos</a>`) +
     `<div class="kpis"><div class="kpi ${nIns ? 'alert' : ''}"><b class="tnum">${nIns}</b><span>inscripciones por preseleccionar</span></div>
    <div class="kpi"><b class="tnum">${act.length}</b><span>personas sirviendo · ${multi} en varias</span></div>
    <div class="kpi ${inc ? 'alert' : ''}"><b class="tnum">${inc}</b><span>con documentación incompleta</span></div>
@@ -543,6 +634,7 @@ const root = $('root');
 root.addEventListener('click', async ev => {
   const t = ev.target.closest('button,[data-ent],tr[data-editp]'); if (!t || t.disabled) return;
   const d = t.dataset;
+  if (d.demo) return startDemo(d.demo);
   if (d.go) return go(d.go);
   if (d.ent) { S.view = 'explorar'; S.ent = d.ent; S.leaving = null; render.keepScroll = false; return render(); }
   if (d.insf) { S.insFilter = d.insf; S.assigning = null; return render(); }
@@ -566,7 +658,8 @@ root.addEventListener('click', async ev => {
   if (d.anul) { S.anul = null; return run('anularInvitacion', { codigo: d.anul }, 'Invitación anulada'); }
   if (d.welcome) return run('darBienvenida', { entidad: S.cent, email: d.welcome }, 'Correo de bienvenida enviado');
   switch (d.act) {
-    case 'signout': return signOut(false);
+    case 'signout': if (DEMO) return exitDemo(); return signOut(false);
+    case 'demo-exit': return exitDemo();
     case 'inv-parse': { S.invText = $('invText').value; S.inv = parseInv(S.invText); return render(); }
     case 'inv-back': S.inv = null; return render();
     case 'cancel-anul': S.anul = null; return render();
@@ -661,5 +754,6 @@ root.addEventListener('input', ev => {
 });
 window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (D && VIEWS[h] && h !== S.view) go(h); });
 
+if (DEMO_START) startDemo(DEMO_START);
 initGoogle();
 })();
