@@ -28,7 +28,11 @@ const CONFIG = {
   HORA_RECORDATORIO: 10,
   // Dirección /exec de esta aplicación web (para los botones de los recordatorios).
   API_URL: 'https://script.google.com/macros/s/AKfycbzYykd0tdj1JUVWh91d3g7QRXMeiG6yZh_YlA1cP5EETIpUOBBSp0L6phpzLOhC1Eet/exec',
-  REMITENTE: 'Voluntariado Arrupe · Pastoral CUSAFA'
+  REMITENTE: 'Voluntariado Arrupe · Pastoral CUSAFA',
+  // Correo del equipo de Pastoral. Si lo rellenas, los correos salen desde esa dirección y las respuestas
+  // llegan ahí, en vez de a la cuenta personal que ejecuta el script. Debe estar configurada en Gmail como
+  // dirección "Enviar como" de esta cuenta (Gmail → Configuración → Cuentas → Enviar como). Si no, déjalo vacío.
+  CORREO_EQUIPO: ''
 };
 
 const TIPOS_DOC = {
@@ -1096,7 +1100,7 @@ function mailInvitacion_(inv, me) {
        <li>Entra con tu cuenta de Google. Si usas este mismo correo (${esc_(inv.email)}), se activará sola.</li>
        <li>Si entras con otra cuenta, escribe el código cuando te lo pida.</li>
      </ol>`,
-    'Abrir la app', '', me.email, url);
+    'Abrir la app', '', CONFIG.CORREO_EQUIPO, url);
 }
 
 function mailInvitacionVol_(inv, me) {
@@ -1128,8 +1132,8 @@ function mailAgradecimiento_(ins, me) {
      <p>Te hemos preseleccionado para ${varias ? 'estos voluntariados' : 'este voluntariado'}:</p><ul style="padding-left:20px">${lista}</ul>
      <p>En los próximos días <b>${varias ? 'las personas que coordinan cada voluntariado' : 'la persona que coordina este voluntariado'} se pondrá${varias ? 'n' : ''} en contacto contigo</b> para darte la bienvenida y contarte cómo empezar.</p>
      <p>Mientras tanto, puedes entrar en la app con esta cuenta de Google para ir completando tu documentación: el certificado de delitos de naturaleza sexual y el compromiso de voluntariado.</p>
-     <p style="margin-bottom:0">Un abrazo,<br>${esc_(me.nombre)}<br><span style="color:#6E8193;font-size:13px">Servicio de Pastoral</span></p>`,
-    'Entrar en la app', 'docs', me.email);
+     <p style="margin-bottom:0">Un abrazo,<br>El equipo de Pastoral<br><span style="color:#6E8193;font-size:13px">Centro Universitario Sagrada Familia</span></p>`,
+    'Entrar en la app', 'docs', CONFIG.CORREO_EQUIPO);
 }
 
 // ───────────────────────── AYUDANTES ─────────────────────────
@@ -1248,8 +1252,13 @@ function mail_(to, subject, html, cta, vista, replyTo, urlBoton) {
     ${html}${boton}
     <p style="font-size:12px;color:#6E8193">Servicio de Pastoral · Centro Universitario Sagrada Familia · Úbeda</p></div>`;
   try {
-    const opts = { to: to.join(','), subject: subject, htmlBody: body, name: CONFIG.REMITENTE };
-    if (replyTo) opts.replyTo = replyTo;
-    MailApp.sendEmail(opts);
+    const opts = { htmlBody: body, name: CONFIG.REMITENTE };
+    const resp = replyTo || CONFIG.CORREO_EQUIPO;
+    if (resp) opts.replyTo = resp;
+    if (CONFIG.CORREO_EQUIPO) {
+      try { GmailApp.sendEmail(to.join(','), subject, '', Object.assign({ from: CONFIG.CORREO_EQUIPO }, opts)); return; }
+      catch (e) { Logger.log('No se pudo enviar desde ' + CONFIG.CORREO_EQUIPO + ', se envía desde la cuenta del script: ' + e); }
+    }
+    MailApp.sendEmail(Object.assign({ to: to.join(','), subject: subject }, opts));
   } catch (e) { Logger.log('Correo no enviado: ' + e); }
 }
