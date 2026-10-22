@@ -635,7 +635,7 @@ function mail_(to, subject, html, cta, vista, replyTo) {
   const boton = cta ? `<p style="margin:24px 0"><a href="${CONFIG.APP_URL.replace(/\/?$/, '/')}${vista ? '#' + vista : ''}" style="background:#12679A;color:#fff;padding:11px 18px;border-radius:10px;text-decoration:none;font-weight:600">${cta}</a></p>` : '';
   const body = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.55;color:#152433;max-width:560px">
     <div style="height:6px;border-radius:6px;background:linear-gradient(90deg,#E58A00,#D9007A,#3A2A85,#8E5A32,#12679A,#D9312B,#55595D,#25995A)"></div>
-    <p style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#6E8193;margin-top:18px">Voluntariado Arrupe · Libres para servir</p>
+    <p style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#6E8193;margin-top:18px">Voluntariado Arrupe</p>
     ${html}${boton}
     <p style="font-size:12px;color:#6E8193">Servicio de Pastoral · Centro Universitario Sagrada Familia · Úbeda</p></div>`;
   try {

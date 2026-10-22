@@ -149,7 +149,7 @@ function vLogin() {
   return `<main class="login"><div class="login-card">
     <div class="logo-wrap"><img src="${LOGO}" alt="Pastoral · Centro Universitario Sagrada Familia"></div>
     <div class="ribbon" aria-hidden="true">${COLORS.slice(0, 8).map(c => `<span style="background:${cvar(c)}"></span>`).join('')}</div>
-    <div style="display:grid;gap:6px"><h1>Voluntariado Arrupe</h1><p class="muted">Libres para servir. Entra con tu cuenta de Google para ver tu voluntariado, tu documentación y tus horas.</p></div>
+    <div style="display:grid;gap:6px"><h1>Voluntariado Arrupe</h1><p class="muted">Entra con tu cuenta de Google para ver tu voluntariado, tu documentación y tus horas.</p></div>
     ${ok ? '<div class="gbtn-host" id="gbtn"></div>' : `<p class="err">${!apiOk ? 'La dirección del script en config.js no es válida: debe empezar por https://script.google.com/ y acabar en /exec.' : 'El ID de cliente de Google en config.js no es válido.'}</p>`}
     ${S.err ? `<p class="err">${esc(S.err)}</p>` : ''}
     <div class="login-note">${ic('lock', 18)}<span>La primera vez, el Servicio de Pastoral revisa tu cuenta antes de darte acceso. Tus documentos solo los ve Pastoral.</span></div>
@@ -166,7 +166,7 @@ function shell(content) {
   return `<div class="mtop"><div class="row"><div class="logo-wrap"><img src="${LOGO}" alt="Pastoral CUSAFA"></div><div style="display:flex;gap:10px;align-items:center"><button class="signout" data-act="signout">Salir</button>${avatar(me, 'var(--brand)')}</div></div><nav class="tabs" aria-label="Secciones">${tabs}</nav></div>
   <div class="shell">
     <aside class="side"><div class="logo-wrap"><img src="${LOGO}" alt="Pastoral · Centro Universitario Sagrada Familia"></div>
-      <div class="motto">Voluntariado Arrupe · <em>Libres para servir</em></div>
+      <div class="motto">Voluntariado Arrupe</div>
       <nav class="nav" aria-label="Secciones">${items}</nav>
       <div class="me">${avatar(me, 'var(--brand)')}<div class="who"><b>${esc(me.nombre)}</b><span>${esc(sub)}</span><br><button class="signout" data-act="signout">Cerrar sesión</button></div></div>
     </aside>
