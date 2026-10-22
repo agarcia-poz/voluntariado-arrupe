@@ -37,7 +37,7 @@ const TIPOS_DOC = {
 };
 
 const HOJAS = {
-  Usuarios: ['email', 'nombre', 'rol', 'estado', 'curso', 'coordEnts', 'alta', 'telefono', 'emailContacto', 'emergenciaNombre', 'emergenciaTelefono', 'avisos'],
+  Usuarios: ['email', 'nombre', 'rol', 'estado', 'curso', 'coordEnts', 'alta', 'telefono', 'emailContacto', 'emergenciaNombre', 'emergenciaTelefono', 'avisos', 'ultimoAcceso'],
   Entidades: ['id', 'nombre', 'lugar', 'etiqueta', 'color', 'descripcion', 'horario', 'cupo', 'ig', 'activa', 'claves'],
   Asignaciones: ['email', 'entidad', 'estado', 'fecha', 'origen'],
   Inscripciones: ['id', 'fecha', 'nombre', 'email', 'curso', 'preferencias', 'preferenciasTexto', 'motivo', 'estado', 'entidad', 'gestionadoPor'],
@@ -320,6 +320,30 @@ const ACCIONES = {
       'Abrir la app', 'vinicio', me.email);
     withLock_(() => updateWhere_('Asignaciones', r => r.email === u.email && r.entidad === ent.id && r.estado === 'activa', { origen: 'bienvenida enviada' }));
     log_(me, 'darBienvenida', u.email);
+    return bootstrap_(me);
+  },
+
+  invitarVoluntarios: (me, d) => {
+    const ent = entidad_(d.entidad);
+    puedeCoordinar_(me, ent.id);
+    const equipo = {};
+    equipo_(ent.id).forEach(u => equipo[u.email] = u);
+    const emails = [...new Set((d.emails || []).map(norm_))].filter(e => equipo[e] && e !== me.email);
+    if (!emails.length) throw httpErr_('Selecciona al menos a una persona de tu equipo');
+    if (emails.length > 40) throw httpErr_('Como máximo 40 invitaciones de una vez');
+    const nuevas = [];
+    withLock_(() => {
+      const usados = new Set(rows_('Invitaciones').map(r => String(r.codigo)));
+      emails.forEach(email => {
+        updateWhere_('Invitaciones', r => r.email === email && r.estado === 'enviada' && r.rol === 'vol' && splitList_(r.entidades).indexOf(ent.id) >= 0, { estado: 'anulada' });
+        let codigo; do { codigo = nuevoCodigo_(); } while (usados.has(codigo)); usados.add(codigo);
+        const inv = { codigo, email, nombre: equipo[email].nombre, rol: 'vol', entidades: ent.id, estado: 'enviada', creado: new Date(), creadoPor: me.email, usadoPor: '', usadoEn: '' };
+        append_('Invitaciones', inv);
+        nuevas.push(inv);
+      });
+    });
+    nuevas.forEach(inv => mailInvitacion_(inv, me));
+    log_(me, 'invitarVoluntarios', ent.id + ' · ' + nuevas.length);
     return bootstrap_(me);
   },
 
@@ -679,6 +703,7 @@ function bootstrap_(me) {
 
   // Coordinación: solo sus entidades, y de los documentos solo el estado (nunca el archivo)
   const coordIds = me.rol === 'pastoral' ? [] : splitList_(me.coordEnts);
+  const invs = coordIds.length ? rows_('Invitaciones') : [];
   if (coordIds.length && me.estado === 'activo') {
     out.coord = {};
     coordIds.forEach(id => {
@@ -689,6 +714,8 @@ function bootstrap_(me) {
           otras: asigs.filter(a => a.email === u.email && a.estado === 'activa' && a.entidad !== id).map(a => a.entidad),
           cert: docState(u.email, 'cert'), comp: docState(u.email, 'comp'), horas: horasDe(u.email, id),
           coordina: splitList_(u.coordEnts).indexOf(id) >= 0,
+          acceso: !!u.ultimoAcceso,
+          invitacion: (() => { const r = invs.filter(x => x.email === u.email && x.rol === 'vol' && splitList_(x.entidades).indexOf(id) >= 0 && x.estado !== 'anulada').pop(); return r ? r.estado : ''; })(),
           nuevo: asigs.some(a => a.email === u.email && a.entidad === id && a.estado === 'activa' && a.origen !== 'bienvenida enviada' && a.origen !== 'histórico' && !splitList_(u.coordEnts).length && daysAgo_(a.fecha) < 30)
         })),
         sesiones: sesiones_(asis.filter(a => a.entidad === id), byEmail),
@@ -728,7 +755,7 @@ function bootstrap_(me) {
       })).reverse(),
       sesiones: sesiones_(asis, byEmail).slice(0, 40),
       invitaciones: rows_('Invitaciones').map(r => ({
-        codigo: String(r.codigo), email: r.email, nombre: r.nombre, entidades: splitList_(r.entidades), estado: r.estado,
+        codigo: String(r.codigo), email: r.email, nombre: r.nombre, rol: r.rol || 'coord', entidades: splitList_(r.entidades), estado: r.estado,
         creado: iso_(r.creado), usadoPor: r.usadoPor, usadoEn: iso_(r.usadoEn)
       })).reverse(),
       hojaUrl: SpreadsheetApp.openById(prop_('SHEET_ID')).getUrl(),
@@ -788,6 +815,7 @@ function currentUser_(who) {
     u.rol = 'pastoral'; u.estado = 'activo';
   }
   if (u.estado === 'baja') throw authErr_('Tu cuenta está dada de baja. Escribe al Servicio de Pastoral.');
+  if (iso_(u.ultimoAcceso) !== hoyISO_(0)) { try { updateWhere_('Usuarios', r => r.email === who.email, { ultimoAcceso: new Date() }); u.ultimoAcceso = new Date(); } catch (e) { } }
   u.foto = who.foto;
   return u;
 }
@@ -959,6 +987,7 @@ function nuevoCodigo_() {
 }
 function aplicarInvitacion_(email, nombre, inv) {
   email = norm_(email);
+  if (inv.rol === 'vol') return aplicarInvitacionVol_(email, nombre, inv);
   const u = findUser_(email);
   const ents = splitList_(inv.entidades);
   const coordEnts = u ? splitList_(u.coordEnts) : [];
@@ -970,7 +999,29 @@ function aplicarInvitacion_(email, nombre, inv) {
   });
   updateWhere_('Invitaciones', r => String(r.codigo) === String(inv.codigo), { estado: 'usada', usadoPor: email, usadoEn: new Date() });
 }
+// Invitación de voluntariado: da acceso a la cuenta que la usa. Si es otra cuenta distinta del correo invitado, la plaza pasa a esa cuenta.
+function aplicarInvitacionVol_(email, nombre, inv) {
+  const invitado = norm_(inv.email);
+  const u = findUser_(email), orig = findUser_(invitado);
+  upsertUser_(email, {
+    nombre: (u && u.nombre && u.nombre !== email && u.nombre !== email.split('@')[0]) ? u.nombre : ((orig && orig.nombre) || inv.nombre || nombre || email),
+    curso: (u && u.curso) || (orig && orig.curso) || '',
+    rol: u && (u.rol === 'pastoral' || u.rol === 'coord') ? u.rol : 'vol',
+    estado: 'activo'
+  });
+  splitList_(inv.entidades).forEach(e => {
+    const yaTiene = rows_('Asignaciones').some(a => a.email === email && a.entidad === e && a.estado === 'activa');
+    if (email !== invitado) {
+      if (yaTiene) updateWhere_('Asignaciones', a => a.email === invitado && a.entidad === e && a.estado === 'activa', { estado: 'baja', fecha: new Date(), origen: 'pasa a ' + email });
+      else if (rows_('Asignaciones').some(a => a.email === invitado && a.entidad === e && a.estado === 'activa'))
+        updateWhere_('Asignaciones', a => a.email === invitado && a.entidad === e && a.estado === 'activa', { email, origen: 'invitación' });
+      else asignar_(email, e, 'invitación');
+    } else if (!yaTiene) asignar_(email, e, 'invitación');
+  });
+  updateWhere_('Invitaciones', r => String(r.codigo) === String(inv.codigo), { estado: 'usada', usadoPor: email, usadoEn: new Date() });
+}
 function mailInvitacion_(inv, me) {
+  if (inv.rol === 'vol') return mailInvitacionVol_(inv, me);
   const ents = splitList_(inv.entidades).map(id => { try { return entidad_(id).nombre; } catch (e) { return id; } });
   const url = CONFIG.APP_URL.replace(/\/?$/, '/') + '?codigo=' + encodeURIComponent(inv.codigo);
   const saludo = inv.nombre ? 'Hola, ' + esc_(String(inv.nombre).split(' ')[0]) + ':' : 'Hola:';
@@ -986,6 +1037,25 @@ function mailInvitacion_(inv, me) {
        <li>Si entras con otra cuenta, escribe el código cuando te lo pida.</li>
      </ol>`,
     'Abrir la app', '', me.email, url);
+}
+
+function mailInvitacionVol_(inv, me) {
+  const ents = splitList_(inv.entidades).map(id => { try { return entidad_(id).nombre; } catch (e) { return id; } });
+  const url = CONFIG.APP_URL.replace(/\/?$/, '/') + '?codigo=' + encodeURIComponent(inv.codigo);
+  const saludo = inv.nombre ? 'Hola, ' + esc_(String(inv.nombre).split(' ')[0]) + ':' : 'Hola:';
+  mail_([inv.email], 'Tu acceso a la app del Voluntariado Arrupe',
+    `<p>${saludo}</p>
+     <p>Soy ${esc_(me.nombre)} y coordino el voluntariado de <b>${esc_(ents.join(' y '))}</b>. Te invito a entrar en la app del Voluntariado Arrupe.</p>
+     <p>Allí verás tu horario y podrás confirmar tu asistencia, firmar el compromiso de voluntariado, subir tu certificado y consultar tus horas.</p>
+     <p style="margin:22px 0 6px">Tu código de acceso:</p>
+     <p style="font-family:Consolas,Menlo,monospace;font-size:28px;font-weight:700;letter-spacing:.12em;color:#12679A;background:#E3F0F8;display:inline-block;padding:10px 18px;border-radius:10px;margin:0">${esc_(inv.codigo)}</p>
+     <ol style="padding-left:20px">
+       <li>Pulsa el botón de abajo para abrir la app.</li>
+       <li>Entra con tu cuenta de Google. Si usas este mismo correo (${esc_(inv.email)}), entrarás directamente.</li>
+       <li>Si prefieres otra cuenta de Google, escribe el código cuando te lo pida.</li>
+     </ol>
+     <p>Si tienes cualquier duda, responde a este correo.</p>`,
+    'Entrar en la app', '', me.email, url);
 }
 
 // ───────────────────────── AYUDANTES ─────────────────────────

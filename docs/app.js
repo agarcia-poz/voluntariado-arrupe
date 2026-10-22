@@ -160,7 +160,7 @@ function demoData(role) {
       ['marta.jimenez@cusafa.es', 'Marta Jiménez Soto', '1.º Ed. Infantil', ['res'], 'ok', 'pend', 3, false, false]
     ].map(x => ({ email: x[0], nombre: x[1], curso: x[2], otras: x[3], cert: x[4], comp: x[5], horas: x[6], coordina: x[7], nuevo: x[8] }));
     const tels = ['611 204 318', '622 845 107', '633 120 984', '644 567 201', '655 903 412', '666 718 225'];
-    equipo.forEach((p, i) => { p.telefono = tels[i]; p.emergencia = i % 2 ? '' : 'Madre · 600 000 00' + i; });
+    equipo.forEach((p, i) => { p.acceso = i < 3; p.invitacion = i === 3 ? 'enviada' : ''; p.telefono = tels[i]; p.emergencia = i % 2 ? '' : 'Madre · 600 000 00' + i; });
     const T = demoTurnos().filter(t => t.entidad === 'hogar').map(t => Object.assign({}, t, { apuntados: t.id === 't1' ? ['Clara O.', 'Lucía M.', 'Carmen V.'] : t.id === 't2' ? ['Javier C.', 'Marta J.'] : [] }));
     const proximos = [];
     T.forEach(t => demoOcc(t, 14).forEach((f, k) => {
@@ -221,6 +221,7 @@ function demoApi(action, d) {
     case 'recordarDocumentos': return { enviados: D2.coord[d.entidad].equipo.filter(p => p.cert !== 'ok' || p.comp !== 'ok').length };
     case 'darBienvenida': D2.coord[d.entidad].equipo.forEach(p => { if (p.email === d.email) p.nuevo = false; }); return D2;
     case 'guardarMisDatos': Object.assign(me, d); return D2;
+    case 'invitarVoluntarios': D2.coord[d.entidad].equipo.forEach(p => { if (d.emails.includes(p.email)) p.invitacion = 'enviada'; }); return D2;
     case 'asignarInscripcion': D2.pastoral.inscripciones.forEach(i => { if (i.id === d.id) { i.estado = 'asignada'; i.entidad = d.entidad; } }); return D2;
     case 'estadoInscripcion': D2.pastoral.inscripciones.forEach(i => { if (i.id === d.id) i.estado = d.estado; }); return D2;
     case 'guardarPersona': { let p = D2.pastoral.personas.find(x => x.email === d.email); if (!p) { p = { email: d.email, alta: todayISO(), asignaciones: [], docs: { cert: { estado: 'pend', url: '' }, comp: { estado: 'pend', url: '' } }, horas: 0, telefono: '', emergencia: '', compromiso: null }; D2.pastoral.personas.push(p); }
@@ -523,11 +524,26 @@ function vCinicio() {
   </div>
   ${galeriaCard(S.cent)}`;
 }
+function appPill(p) {
+  if (p.acceso) return '<span class="pill ok">Ha entrado</span>';
+  if (p.invitacion === 'enviada') return '<span class="pill info">Invitación enviada</span>';
+  if (p.invitacion === 'usada') return '<span class="pill ok">Activada</span>';
+  return '<span class="pill warn">Sin invitar</span>';
+}
 function vEquipo() {
-  const sel = centSel(), e = E(S.cent), t = D.coord[S.cent].equipo;
+  const sel = centSel(), e = E(S.cent), t = D.coord[S.cent].equipo, me = D.me.email;
+  if (!S.isel || S.isel.ent !== S.cent) S.isel = { ent: S.cent, set: new Set() };
+  const elegibles = t.filter(p => p.email !== me);
+  const sinEntrar = elegibles.filter(p => !p.acceso);
+  const n = S.isel.set.size;
   return header('Coordinación', 'Tu equipo', `${t.length} ${t.length === 1 ? 'persona sirve' : 'personas sirven'} en ${esc(e.nombre)}.`, sel + `<button class="btn ghost" data-act="copy-emails">${ic('mail', 18)}Copiar correos del equipo</button>`) +
-    (t.length ? `<div class="table-wrap"><table><thead><tr><th>Voluntario/a</th><th>Curso</th><th>Contacto</th><th>También en</th><th>Certificado</th><th>Compromiso</th><th>Horas aquí</th></tr></thead><tbody>
-    ${t.map(p => `<tr><td><b>${esc(p.nombre)}</b>${p.coordina ? ' <span class="pill info">Coordina</span>' : ''}</td><td class="muted">${esc(p.curso)}</td><td class="small">${esc(p.email)}${p.telefono ? `<br><b>${esc(p.telefono)}</b>` : ''}${p.emergencia ? `<br><span class="hint">Emergencias: ${esc(p.emergencia)}</span>` : ''}</td><td><div class="chips">${p.otras.map(chip).join('') || '<span class="hint">—</span>'}</div></td><td>${pill(p.cert)}</td><td>${pill(p.comp)}</td><td class="tnum"><b>${nf(p.horas)} h</b></td></tr>`).join('')}
+    (t.length ? `<div class="card" style="gap:10px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:grid;gap:2px;min-width:0;flex:1 1 280px"><h2>Invitar a la app</h2><span class="muted small">Marca a quienes quieras invitar. Recibirán un correo con su código y el enlace para entrar.</span></div>
+      <div class="actions">${sinEntrar.length ? `<button class="btn ghost sm" data-act="isel-pend">Marcar a quienes no han entrado (${sinEntrar.length})</button>` : ''}${n ? '<button class="btn ghost sm" data-act="isel-none">Quitar selección</button>' : ''}
+      <button class="btn primary" data-act="send-vinv" ${n ? '' : 'disabled'}>${ic('mail', 18)}Enviar invitación${n ? ` (${n})` : ''}</button></div></div></div>
+    <div class="table-wrap"><table><thead><tr><th style="width:44px"><span class="sr-only">Seleccionar</span></th><th>Voluntario/a</th><th>App</th><th>Curso</th><th>Contacto</th><th>También en</th><th>Certificado</th><th>Compromiso</th><th>Horas aquí</th></tr></thead><tbody>
+    ${t.map((p, i) => `<tr><td>${p.email === me ? '' : `<input type="checkbox" id="is${i}" data-isel="${esc(p.email)}" ${S.isel.set.has(p.email) ? 'checked' : ''} aria-label="Seleccionar a ${esc(p.nombre)}" style="width:20px;height:20px;accent-color:var(--brand)">`}</td>
+      <td><label for="is${i}"><b>${esc(p.nombre)}</b></label>${p.coordina ? ' <span class="pill info">Coordina</span>' : ''}</td><td>${p.email === me ? '<span class="hint">Tú</span>' : appPill(p)}</td><td class="muted">${esc(p.curso)}</td>
+      <td class="small">${esc(p.email)}${p.telefono ? `<br><b>${esc(p.telefono)}</b>` : ''}${p.emergencia ? `<br><span class="hint">Emergencias: ${esc(p.emergencia)}</span>` : ''}</td><td><div class="chips">${p.otras.map(chip).join('') || '<span class="hint">—</span>'}</div></td><td>${pill(p.cert)}</td><td>${pill(p.comp)}</td><td class="tnum"><b>${nf(p.horas)} h</b></td></tr>`).join('')}
     </tbody></table></div>` : '<div class="empty">Aún no hay nadie asignado. Pastoral te avisará por correo cuando incorpore a alguien.</div>');
 }
 function vAsistencia() {
@@ -662,8 +678,8 @@ function vInvitaciones() {
       ${prev.length && listos < prev.length ? `<span class="hint">Falta elegir la entidad en ${prev.length - listos} ${prev.length - listos === 1 ? 'fila' : 'filas'}.</span>` : ''}</div>`}
   </div>
   <div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h2>Enviadas</h2><span class="small muted tnum">${L.filter(x => x.estado === 'usada').length} activadas · ${L.filter(x => x.estado === 'enviada').length} pendientes</span></div>
-    ${L.length ? `<div class="table-wrap"><table><thead><tr><th>Persona</th><th>Coordina</th><th>Código</th><th>Estado</th><th></th></tr></thead><tbody>
-    ${L.map(x => `<tr><td><b>${esc(x.nombre || x.email)}</b>${x.nombre ? `<br><span class="small muted">${esc(x.email)}</span>` : ''}</td><td><div class="chips">${x.entidades.map(chip).join('')}</div></td>
+    ${L.length ? `<div class="table-wrap"><table><thead><tr><th>Persona</th><th>Para</th><th>Código</th><th>Estado</th><th></th></tr></thead><tbody>
+    ${L.map(x => `<tr><td><b>${esc(x.nombre || x.email)}</b>${x.nombre ? `<br><span class="small muted">${esc(x.email)}</span>` : ''}</td><td><span class="hint">${x.rol === 'vol' ? 'Voluntariado en' : 'Coordina'}</span><div class="chips">${x.entidades.map(chip).join('')}</div></td>
       <td class="tnum" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;letter-spacing:.06em">${esc(x.codigo)}</td>
       <td><span class="pill ${(st[x.estado] || st.enviada)[0]}">${(st[x.estado] || st.enviada)[1]}</span>${x.estado === 'usada' && x.usadoPor && x.usadoPor !== x.email ? `<br><span class="hint">con ${esc(x.usadoPor)}</span>` : ''}<br><span class="hint">${fmt(x.estado === 'usada' ? x.usadoEn : x.creado)}</span></td>
       <td>${x.estado === 'enviada' ? (S.anul === x.codigo ? `<span class="actions"><button class="btn danger sm" data-anul="${esc(x.codigo)}">Anular</button><button class="btn ghost sm" data-act="cancel-anul">No</button></span>` : `<span class="actions"><button class="btn ghost sm" data-reinv="${esc(x.codigo)}">Reenviar</button><button class="btn ghost sm" data-askanul="${esc(x.codigo)}">Anular</button></span>`) : ''}</td></tr>`).join('')}
@@ -955,6 +971,14 @@ root.addEventListener('click', async ev => {
     case 'inv-parse': { S.invText = $('invText').value; S.inv = parseInv(S.invText); return render(); }
     case 'inv-back': S.inv = null; return render();
     case 'cancel-delt': S.delT = null; return render();
+    case 'isel-pend': D.coord[S.cent].equipo.filter(p => !p.acceso && p.email !== D.me.email).forEach(p => S.isel.set.add(p.email)); return render();
+    case 'isel-none': S.isel.set.clear(); return render();
+    case 'send-vinv': {
+      const emails = [...S.isel.set]; if (!emails.length) return toast('Selecciona al menos a una persona');
+      const r = await run('invitarVoluntarios', { entidad: S.cent, emails }, `${emails.length} ${emails.length === 1 ? 'invitación enviada' : 'invitaciones enviadas'}`);
+      if (r) { S.isel.set.clear(); render(); }
+      return;
+    }
     case 'cancel-delm': S.delM = null; return render();
     case 'att-conf': confirmadosEn(S.att.date).forEach(e => S.att.sel.add(e)); return render();
     case 'resign': S.resign = true; S.cf = {}; return render();
@@ -1060,6 +1084,7 @@ root.addEventListener('change', ev => {
     rd.onerror = () => toast('No se pudo leer el archivo');
     rd.readAsDataURL(f);
   }
+  if (t.dataset.isel) { t.checked ? S.isel.set.add(t.dataset.isel) : S.isel.set.delete(t.dataset.isel); render(); return; }
   if (t.dataset.att) { t.checked ? S.att.sel.add(t.dataset.att) : S.att.sel.delete(t.dataset.att); }
   if (t.id === 'attDate') { S.att.date = t.value; render(); }
   if (t.dataset.apuntar) run('apuntarTurno', { turno: t.dataset.apuntar, apuntar: t.checked }, t.checked ? 'Turno marcado como tuyo' : 'Turno desmarcado');
