@@ -42,6 +42,13 @@ const IG = 'https://www.instagram.com/unisafa/';
 let TOKEN = null, D = null;
 const S = { view: null, ent: null, leaving: null, cent: null, assigning: null, insFilter: 'nueva', q: '', editP: null, editE: null, editN: null, delN: null, delSes: null, rejecting: null, att: null, err: '' };
 try { TOKEN = sessionStorage.getItem('arrupe-token'); } catch (e) { }
+let CODE = null;
+try {
+  const u = new URL(location.href), c = u.searchParams.get('codigo');
+  if (c) { sessionStorage.setItem('arrupe-code', c); u.searchParams.delete('codigo'); history.replaceState(null, '', u.pathname + u.search + u.hash); }
+  CODE = sessionStorage.getItem('arrupe-code');
+} catch (e) { }
+function clearCode() { CODE = null; try { sessionStorage.removeItem('arrupe-code'); } catch (e) { } }
 
 /* ───────── utilidades ───────── */
 const E = id => (D && D.entidades.find(e => e.id === id)) || { id, nombre: id, color: 'grey', horario: '', lugar: '' };
@@ -92,6 +99,14 @@ async function load() {
   $('root').innerHTML = '<div class="boot"><div class="spinner" role="status" aria-label="Cargando"></div></div>';
   try { D = await api('bootstrap'); }
   catch (e) { S.err = e.message; D = null; if (TOKEN) { TOKEN = null; try { sessionStorage.removeItem('arrupe-token'); } catch (x) { } } }
+  if (D && CODE) {
+    const c = caps();
+    if (c.isP) clearCode();
+    else {
+      try { D = await api('canjearCodigo', { codigo: CODE }); clearCode(); S.view = null; toast('Invitación activada. Ya puedes coordinar tu voluntariado.'); }
+      catch (e) { if (/ya se ha usado/.test(e.message) && caps().isC) clearCode(); else S.codeErr = e.message; }
+    }
+  }
   render();
 }
 function signOut(silent, msg) {
@@ -119,7 +134,7 @@ function nav() {
   const c = caps();
   if (c.pend) return [['espera', 'Tu cuenta', 'home'], ['explorar', 'Dónde servir', 'compass'], ['noticias', 'Noticias', 'bell']];
   const n = [];
-  if (c.isP) n.push(['panel', 'Panel', 'chart'], ['ins', 'Inscripciones', 'inbox'], ['personas', 'Personas', 'users'], ['entidades', 'Entidades', 'building']);
+  if (c.isP) n.push(['panel', 'Panel', 'chart'], ['ins', 'Inscripciones', 'inbox'], ['personas', 'Personas', 'users'], ['invitaciones', 'Invitaciones', 'mail'], ['entidades', 'Entidades', 'building']);
   if (c.isC) n.push(['cinicio', 'Mi entidad', 'building'], ['equipo', 'Equipo', 'users'], ['asistencia', 'Asistencia', 'clock']);
   if (c.isVol) n.push(['vinicio', 'Mi voluntariado', 'home'], ['docs', 'Documentos', 'file'], ['horas', 'Mis horas', 'clock']);
   n.push(['explorar', 'Dónde servir', 'compass'], ['noticias', 'Noticias', 'bell']);
@@ -152,6 +167,7 @@ function vLogin() {
     <div style="display:grid;gap:6px"><h1>Voluntariado Arrupe</h1><p class="muted">Entra con tu cuenta de Google para ver tu voluntariado, tu documentación y tus horas.</p></div>
     ${ok ? '<div class="gbtn-host" id="gbtn"></div>' : `<p class="err">${!apiOk ? 'La dirección del script en config.js no es válida: debe empezar por https://script.google.com/ y acabar en /exec.' : 'El ID de cliente de Google en config.js no es válido.'}</p>`}
     ${S.err ? `<p class="err">${esc(S.err)}</p>` : ''}
+    ${CODE ? `<div class="note">${ic('mail', 18)}<span>Tienes una <b>invitación para coordinar</b>. Entra con tu cuenta de Google y se activará al momento.</span></div>` : ''}
     <div class="login-note">${ic('lock', 18)}<span>La primera vez, el Servicio de Pastoral revisa tu cuenta antes de darte acceso. Tus documentos solo los ve Pastoral.</span></div>
   </div></main>`;
 }
@@ -186,7 +202,10 @@ function artSVG(seed) {
 /* --- cuenta pendiente --- */
 function vEspera() {
   return header('Bienvenida', 'Tu cuenta está en revisión', 'El Servicio de Pastoral la aprobará en breve. Te llegará un correo cuando te asignen un voluntariado. Mientras, puedes conocer dónde servir.') +
-    `<div class="card examen"><p class="quote">Antes de elegir dónde servir, pregúntate qué te mueve. Lo que te mueve también te sostiene.</p>
+    `<div class="card"><h2>¿Tienes un código de invitación?</h2><p class="muted small">Si Pastoral te ha invitado a coordinar, escribe aquí el código que te llegó por correo.</p>
+      <div class="actions"><input type="text" id="codeIn" value="${esc(CODE || '')}" placeholder="ABC-123" autocomplete="one-time-code" style="max-width:200px;text-transform:uppercase;letter-spacing:.1em;font-weight:700"><button class="btn primary" data-act="redeem">Activar</button></div>
+      ${S.codeErr ? `<p class="err">${esc(S.codeErr)}</p>` : ''}</div>
+    <div class="card examen"><p class="quote">Antes de elegir dónde servir, pregúntate qué te mueve. Lo que te mueve también te sostiene.</p>
     <button class="btn primary" data-go="explorar" style="justify-self:start">${ic('compass', 18)}Ver los voluntariados</button></div>`;
 }
 
@@ -397,6 +416,55 @@ function editPersona() {
     ${isNew ? '' : `<div><span class="eyebrow">Documentación</span><div class="list">${Object.keys(D.config.tiposDoc).map(docRow).join('')}</div></div>`}
   </div>`;
 }
+const normTxt = s => String(s || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim();
+function matchEnt(txt) {
+  const n = normTxt(txt); if (!n) return '';
+  const ents = D.entidades;
+  let e = ents.find(x => normTxt(x.id) === n || normTxt(x.nombre) === n);
+  if (!e) e = ents.find(x => (n.length >= 4 && normTxt(x.nombre).includes(n)) || n.includes(normTxt(x.nombre)));
+  if (!e) e = ents.find(x => String(x.claves || '').split(',').map(normTxt).some(k => k.length >= 3 && n.includes(k)));
+  return e ? e.id : '';
+}
+function parseInv(text) {
+  const out = [];
+  String(text || '').split(/\r?\n/).forEach(line => {
+    const f = line.split(/\t|;|,/).map(s => s.trim()).filter(Boolean);
+    const email = (f.find(x => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(x)) || '').toLowerCase();
+    if (!email) return;
+    let ent = '', nombre = '';
+    f.filter(x => x.toLowerCase() !== email).forEach(x => { const m = matchEnt(x); if (m && !ent) ent = m; else if (!m && !nombre) nombre = x; });
+    out.push({ email, nombre, ent });
+  });
+  return out;
+}
+function vInvitaciones() {
+  const L = D.pastoral.invitaciones || [];
+  const ents = D.entidades.filter(e => e.activa);
+  const st = { enviada: ['info', 'Pendiente'], usada: ['ok', 'Activada'], anulada: ['bad', 'Anulada'] };
+  const prev = S.inv;
+  const listos = prev ? prev.filter(x => x.ent).length : 0;
+  return header('Servicio de Pastoral', 'Invitaciones a coordinación', 'Pega los correos de los coordinadores con su entidad. Cada persona recibe un correo con su código y el enlace a la app. Si entra con ese mismo correo, se activa sola; si usa otra cuenta de Google, escribe el código.') +
+  `<div class="card"><h2>${prev ? 'Revisa antes de enviar' : 'Nuevas invitaciones'}</h2>
+    ${!prev ? `<div class="field"><label for="invText">Una línea por persona: correo, entidad y, si quieres, nombre</label>
+      <textarea id="invText" style="min-height:160px;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.9rem" placeholder="ana.sanchez@cusafa.es, Síndrome de Down, Ana Sánchez&#10;pablo@cusafa.es; Residencia de Ancianos&#10;pablo@cusafa.es; Alzheimer">${esc(S.invText || '')}</textarea>
+      <span class="hint">Puedes copiar y pegar directamente desde una hoja de cálculo. Si alguien coordina dos entidades, ponlo en dos líneas.</span></div>
+      <div class="actions"><button class="btn primary" data-act="inv-parse">${ic('arrow', 18)}Revisar</button></div>`
+    : `${prev.length ? `<div class="table-wrap"><table style="min-width:640px"><thead><tr><th>Correo</th><th>Nombre</th><th>Coordinará</th><th></th></tr></thead><tbody>
+      ${prev.map((x, i) => `<tr><td class="small">${esc(x.email)}</td><td><input type="text" data-invnom="${i}" value="${esc(x.nombre)}" placeholder="Opcional"></td>
+        <td><select data-invent="${i}" ${x.ent ? '' : 'style="border-color:var(--warn)"'}><option value="">— Elige entidad —</option>${ents.map(e => `<option value="${esc(e.id)}" ${x.ent === e.id ? 'selected' : ''}>${esc(e.nombre)}</option>`).join('')}</select></td>
+        <td><button class="btn ghost sm" data-invrm="${i}" aria-label="Quitar">Quitar</button></td></tr>`).join('')}</tbody></table></div>` : '<div class="empty">No he encontrado ningún correo en lo que has pegado.</div>'}
+      <div class="actions"><button class="btn primary" data-act="inv-send" ${prev.length && listos === prev.length ? '' : 'disabled'}>${ic('mail', 18)}Enviar ${prev.length} ${prev.length === 1 ? 'invitación' : 'invitaciones'}</button><button class="btn ghost" data-act="inv-back">Volver a editar</button>
+      ${prev.length && listos < prev.length ? `<span class="hint">Falta elegir la entidad en ${prev.length - listos} ${prev.length - listos === 1 ? 'fila' : 'filas'}.</span>` : ''}</div>`}
+  </div>
+  <div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h2>Enviadas</h2><span class="small muted tnum">${L.filter(x => x.estado === 'usada').length} activadas · ${L.filter(x => x.estado === 'enviada').length} pendientes</span></div>
+    ${L.length ? `<div class="table-wrap"><table><thead><tr><th>Persona</th><th>Coordina</th><th>Código</th><th>Estado</th><th></th></tr></thead><tbody>
+    ${L.map(x => `<tr><td><b>${esc(x.nombre || x.email)}</b>${x.nombre ? `<br><span class="small muted">${esc(x.email)}</span>` : ''}</td><td><div class="chips">${x.entidades.map(chip).join('')}</div></td>
+      <td class="tnum" style="font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700;letter-spacing:.06em">${esc(x.codigo)}</td>
+      <td><span class="pill ${(st[x.estado] || st.enviada)[0]}">${(st[x.estado] || st.enviada)[1]}</span>${x.estado === 'usada' && x.usadoPor && x.usadoPor !== x.email ? `<br><span class="hint">con ${esc(x.usadoPor)}</span>` : ''}<br><span class="hint">${fmt(x.estado === 'usada' ? x.usadoEn : x.creado)}</span></td>
+      <td>${x.estado === 'enviada' ? (S.anul === x.codigo ? `<span class="actions"><button class="btn danger sm" data-anul="${esc(x.codigo)}">Anular</button><button class="btn ghost sm" data-act="cancel-anul">No</button></span>` : `<span class="actions"><button class="btn ghost sm" data-reinv="${esc(x.codigo)}">Reenviar</button><button class="btn ghost sm" data-askanul="${esc(x.codigo)}">Anular</button></span>`) : ''}</td></tr>`).join('')}
+    </tbody></table></div>` : '<p class="muted small">Todavía no has enviado ninguna invitación.</p>'}
+  </div>`;
+}
 function vEntidades() {
   return header('Servicio de Pastoral', 'Entidades', 'Lo que ve el alumnado en "Dónde servir", las plazas y quién coordina.', `<button class="btn primary" data-edite="__new">Añadir entidad</button>`) +
     (S.editE ? editEntidad() : '') +
@@ -447,7 +515,7 @@ function editNoticia() {
 }
 
 /* ───────── render ───────── */
-const VIEWS = { espera: vEspera, explorar: vExplorar, vinicio: vVinicio, docs: vDocs, horas: vHoras, cinicio: vCinicio, equipo: vEquipo, asistencia: vAsistencia, panel: vPanel, ins: vIns, personas: vPersonas, entidades: vEntidades, noticias: vNoticias };
+const VIEWS = { espera: vEspera, explorar: vExplorar, vinicio: vVinicio, docs: vDocs, horas: vHoras, cinicio: vCinicio, equipo: vEquipo, asistencia: vAsistencia, panel: vPanel, ins: vIns, personas: vPersonas, invitaciones: vInvitaciones, entidades: vEntidades, noticias: vNoticias };
 function render() {
   const root = $('root');
   if (!D) {
@@ -492,9 +560,30 @@ root.addEventListener('click', async ev => {
   if (d.deln) { S.delN = null; return run('borrarNoticia', { id: d.deln }, 'Aviso borrado'); }
   if (d.askdelses) { S.delSes = d.askdelses; return render(); }
   if (d.delses) { S.delSes = null; return run('borrarSesion', { sesion: d.delses }, 'Sesión borrada'); }
+  if (d.invrm) { S.inv.splice(+d.invrm, 1); return render(); }
+  if (d.reinv) return run('reenviarInvitacion', { codigo: d.reinv }, 'Invitación reenviada');
+  if (d.askanul) { S.anul = d.askanul; return render(); }
+  if (d.anul) { S.anul = null; return run('anularInvitacion', { codigo: d.anul }, 'Invitación anulada'); }
   if (d.welcome) return run('darBienvenida', { entidad: S.cent, email: d.welcome }, 'Correo de bienvenida enviado');
   switch (d.act) {
     case 'signout': return signOut(false);
+    case 'inv-parse': { S.invText = $('invText').value; S.inv = parseInv(S.invText); return render(); }
+    case 'inv-back': S.inv = null; return render();
+    case 'cancel-anul': S.anul = null; return render();
+    case 'inv-send': {
+      const lista = S.inv.map(x => ({ email: x.email, nombre: x.nombre, entidades: [x.ent] }));
+      const n = new Set(lista.map(x => x.email)).size;
+      const r = await run('crearInvitaciones', { lista }, `${n} ${n === 1 ? 'invitación enviada' : 'invitaciones enviadas'}`);
+      if (r) { S.inv = null; S.invText = ''; render(); }
+      return;
+    }
+    case 'redeem': {
+      const v = $('codeIn').value.trim(); if (!v) return toast('Escribe el código');
+      S.codeErr = '';
+      const r = await run('canjearCodigo', { codigo: v }, 'Invitación activada. Ya puedes coordinar tu voluntariado.');
+      if (r) { clearCode(); S.view = null; render(); } else { S.codeErr = 'No se pudo activar. Revisa el código.'; render(); }
+      return;
+    }
     case 'back': S.ent = null; return render();
     case 'join': return run('solicitarEntidad', { entidad: S.ent }, 'Solicitud enviada. Pastoral te responderá pronto.');
     case 'leave': S.leaving = S.ent; return render();
@@ -564,6 +653,8 @@ root.addEventListener('change', ev => {
   if (t.dataset.att) { t.checked ? S.att.sel.add(t.dataset.att) : S.att.sel.delete(t.dataset.att); }
   if (t.id === 'attDate') S.att.date = t.value;
   if (t.id === 'centSel') { S.cent = t.value; render(); }
+  if (t.dataset.invent) { S.inv[+t.dataset.invent].ent = t.value; render(); }
+  if (t.dataset.invnom) { S.inv[+t.dataset.invnom].nombre = t.value; }
 });
 root.addEventListener('input', ev => {
   if (ev.target.id === 'q') { S.q = ev.target.value; const pos = ev.target.selectionStart; render(); const q = $('q'); q.focus(); q.setSelectionRange(pos, pos); }

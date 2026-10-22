@@ -39,7 +39,8 @@ const HOJAS = {
   Asistencia: ['sesion', 'fecha', 'entidad', 'email', 'horas', 'registradoPor', 'creado'],
   Noticias: ['id', 'fecha', 'titulo', 'detalle', 'tipo', 'autor'],
   Reflexiones: ['email', 'fecha', 'texto'],
-  Registro: ['fecha', 'email', 'accion', 'detalle']
+  Registro: ['fecha', 'email', 'accion', 'detalle'],
+  Invitaciones: ['codigo', 'email', 'nombre', 'rol', 'entidades', 'estado', 'creado', 'creadoPor', 'usadoPor', 'usadoEn']
 };
 
 const ENTIDADES_INICIALES = [
@@ -398,6 +399,64 @@ const ACCIONES = {
     });
     return bootstrap_(me);
   },
+  // ── invitaciones de coordinación ──
+  crearInvitaciones: (me, d) => {
+    pastoral_(me);
+    const ids = new Set(rows_('Entidades').map(e => e.id));
+    const porEmail = {};
+    (d.lista || []).forEach(x => {
+      const email = norm_(x.email);
+      if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw httpErr_('Correo no válido: ' + (x.email || '(vacío)'));
+      const ents = (x.entidades || []).filter(e => ids.has(e));
+      if (!ents.length) throw httpErr_('Falta la entidad de ' + email);
+      if (!porEmail[email]) porEmail[email] = { email, nombre: String(x.nombre || '').trim(), entidades: [] };
+      ents.forEach(e => { if (porEmail[email].entidades.indexOf(e) < 0) porEmail[email].entidades.push(e); });
+      if (!porEmail[email].nombre && x.nombre) porEmail[email].nombre = String(x.nombre).trim();
+    });
+    const lista = Object.values(porEmail);
+    if (!lista.length) throw httpErr_('Añade al menos una persona');
+    if (lista.length > 60) throw httpErr_('Como máximo 60 invitaciones de una vez');
+    const nuevas = [];
+    withLock_(() => {
+      const usados = new Set(rows_('Invitaciones').map(r => String(r.codigo)));
+      lista.forEach(x => {
+        // Anula invitaciones pendientes anteriores para ese correo
+        updateWhere_('Invitaciones', r => r.email === x.email && r.estado === 'enviada', { estado: 'anulada' });
+        let codigo; do { codigo = nuevoCodigo_(); } while (usados.has(codigo)); usados.add(codigo);
+        const inv = { codigo, email: x.email, nombre: x.nombre, rol: 'coord', entidades: x.entidades.join(','), estado: 'enviada', creado: new Date(), creadoPor: me.email, usadoPor: '', usadoEn: '' };
+        append_('Invitaciones', inv);
+        nuevas.push(inv);
+      });
+    });
+    nuevas.forEach(inv => mailInvitacion_(inv, me));
+    log_(me, 'crearInvitaciones', nuevas.length + ' invitaciones');
+    return bootstrap_(me);
+  },
+  reenviarInvitacion: (me, d) => {
+    pastoral_(me);
+    const inv = rows_('Invitaciones').find(r => String(r.codigo) === String(d.codigo) && r.estado === 'enviada');
+    if (!inv) throw httpErr_('Esta invitación ya no está pendiente');
+    mailInvitacion_(inv, me);
+    log_(me, 'reenviarInvitacion', inv.email);
+    return bootstrap_(me);
+  },
+  anularInvitacion: (me, d) => {
+    pastoral_(me);
+    withLock_(() => updateWhere_('Invitaciones', r => String(r.codigo) === String(d.codigo) && r.estado === 'enviada', { estado: 'anulada' }));
+    log_(me, 'anularInvitacion', d.codigo);
+    return bootstrap_(me);
+  },
+  canjearCodigo: (me, d) => {
+    const codigo = String(d.codigo || '').toUpperCase().replace(/[^A-Z0-9]/g, '').replace(/^(.{3})(.{3})$/, '$1-$2');
+    const inv = rows_('Invitaciones').find(r => String(r.codigo) === codigo);
+    if (!inv) throw httpErr_('Ese código no existe. Revisa que esté bien escrito.');
+    if (inv.estado === 'usada') throw httpErr_('Este código ya se ha usado. Si eras tú, ya tienes acceso.');
+    if (inv.estado !== 'enviada') throw httpErr_('Este código está anulado. Pide uno nuevo a Pastoral.');
+    withLock_(() => aplicarInvitacion_(me.email, me.nombre, inv));
+    log_(me, 'canjearCodigo', codigo);
+    return bootstrap_(findUser_(me.email) || me);
+  },
+
   borrarNoticia: (me, d) => {
     pastoral_(me);
     withLock_(() => deleteWhere_('Noticias', n => String(n.id) === String(d.id)));
@@ -479,6 +538,10 @@ function bootstrap_(me) {
         preferencias: splitList_(r.preferencias), preferenciasTexto: r.preferenciasTexto, motivo: r.motivo, estado: r.estado, entidad: r.entidad
       })).reverse(),
       sesiones: sesiones_(asis, byEmail).slice(0, 40),
+      invitaciones: rows_('Invitaciones').map(r => ({
+        codigo: String(r.codigo), email: r.email, nombre: r.nombre, entidades: splitList_(r.entidades), estado: r.estado,
+        creado: iso_(r.creado), usadoPor: r.usadoPor, usadoEn: iso_(r.usadoEn)
+      })).reverse(),
       hojaUrl: SpreadsheetApp.openById(prop_('SHEET_ID')).getUrl(),
       carpetaUrl: DriveApp.getFolderById(prop_('FOLDER_ID')).getUrl()
     };
@@ -517,6 +580,12 @@ function verify_(token) {
 function currentUser_(who) {
   let u = findUser_(who.email);
   const esPastoral = CONFIG.PASTORAL.map(norm_).indexOf(who.email) >= 0;
+  // Si hay una invitación pendiente para este mismo correo, se activa sola al entrar
+  const inv = esPastoral ? null : rows_('Invitaciones').find(r => r.email === who.email && r.estado === 'enviada');
+  if (inv && (!u || u.estado !== 'baja')) {
+    withLock_(() => aplicarInvitacion_(who.email, who.nombre, inv));
+    u = findUser_(who.email);
+  }
   if (!u) {
     u = { email: who.email, nombre: who.nombre, rol: esPastoral ? 'pastoral' : 'vol', estado: esPastoral ? 'activo' : 'pendiente', curso: '', coordEnts: '', alta: new Date() };
     withLock_(() => { if (!findUser_(who.email)) append_('Usuarios', u); });
@@ -539,6 +608,45 @@ function puedeCoordinar_(me, entId) {
   if (me.rol === 'pastoral') return;
   activo_(me);
   if (splitList_(me.coordEnts).indexOf(entId) < 0) throw httpErr_('No coordinas esta entidad');
+}
+
+// ───────────────────────── INVITACIONES ─────────────────────────
+function nuevoCodigo_() {
+  const abc = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, Utilities.getUuid() + Date.now());
+  let s = '';
+  for (let i = 0; i < 6; i++) s += abc[(bytes[i] + 256) % abc.length];
+  return s.slice(0, 3) + '-' + s.slice(3);
+}
+function aplicarInvitacion_(email, nombre, inv) {
+  email = norm_(email);
+  const u = findUser_(email);
+  const ents = splitList_(inv.entidades);
+  const coordEnts = u ? splitList_(u.coordEnts) : [];
+  ents.forEach(e => { if (coordEnts.indexOf(e) < 0) coordEnts.push(e); });
+  upsertUser_(email, {
+    nombre: (u && u.nombre && u.nombre !== email && u.nombre !== email.split('@')[0]) ? u.nombre : (inv.nombre || nombre || email),
+    rol: u && u.rol === 'pastoral' ? 'pastoral' : (inv.rol || 'coord'),
+    estado: 'activo', coordEnts: coordEnts.join(',')
+  });
+  updateWhere_('Invitaciones', r => String(r.codigo) === String(inv.codigo), { estado: 'usada', usadoPor: email, usadoEn: new Date() });
+}
+function mailInvitacion_(inv, me) {
+  const ents = splitList_(inv.entidades).map(id => { try { return entidad_(id).nombre; } catch (e) { return id; } });
+  const url = CONFIG.APP_URL.replace(/\/?$/, '/') + '?codigo=' + encodeURIComponent(inv.codigo);
+  const saludo = inv.nombre ? 'Hola, ' + esc_(String(inv.nombre).split(' ')[0]) + ':' : 'Hola:';
+  mail_([inv.email], 'Tu invitación para coordinar el Voluntariado Arrupe',
+    `<p>${saludo}</p>
+     <p>Gracias por aceptar coordinar el Voluntariado Arrupe en <b>${esc_(ents.join(' y '))}</b>. Acompañar a otros mientras sirven es también una forma de servir.</p>
+     <p>Desde la app podrás ver a tu equipo, registrar la asistencia y saber quién tiene la documentación al día.</p>
+     <p style="margin:22px 0 6px">Tu código de invitación:</p>
+     <p style="font-family:Consolas,Menlo,monospace;font-size:28px;font-weight:700;letter-spacing:.12em;color:#12679A;background:#E3F0F8;display:inline-block;padding:10px 18px;border-radius:10px;margin:0">${esc_(inv.codigo)}</p>
+     <ol style="padding-left:20px">
+       <li>Pulsa el botón de abajo para abrir la app.</li>
+       <li>Entra con tu cuenta de Google. Si usas este mismo correo (${esc_(inv.email)}), se activará sola.</li>
+       <li>Si entras con otra cuenta, escribe el código cuando te lo pida.</li>
+     </ol>`,
+    'Abrir la app', '', me.email, url);
 }
 
 // ───────────────────────── AYUDANTES ─────────────────────────
@@ -572,7 +680,16 @@ function avisarAsignacion_(email, nombre, ent) {
 let _ss = null; const _cache = {};
 function ss_() { return _ss || (_ss = SpreadsheetApp.openById(prop_('SHEET_ID'))); }
 function prop_(k) { const v = PropertiesService.getScriptProperties().getProperty(k); if (!v) throw new Error('Falta ejecutar setup()'); return v; }
-function sheet_(name) { const s = ss_().getSheetByName(name); if (!s) throw new Error('Falta la hoja ' + name + '. Ejecuta setup().'); return s; }
+function sheet_(name) {
+  let s = ss_().getSheetByName(name);
+  if (!s && HOJAS[name]) { // crea sola cualquier hoja nueva que añadan futuras versiones
+    s = ss_().insertSheet(name);
+    s.getRange(1, 1, 1, HOJAS[name].length).setValues([HOJAS[name]]).setFontWeight('bold').setBackground('#E3F0F8');
+    s.setFrozenRows(1);
+  }
+  if (!s) throw new Error('Falta la hoja ' + name + '. Ejecuta setup().');
+  return s;
+}
 function rows_(name) {
   if (_cache[name]) return _cache[name];
   const sh = sheet_(name);
@@ -629,10 +746,10 @@ function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).se
 function httpErr_(m) { return new Error(m); }
 function authErr_(m) { const e = new Error(m); e.auth = true; return e; }
 
-function mail_(to, subject, html, cta, vista, replyTo) {
+function mail_(to, subject, html, cta, vista, replyTo, urlBoton) {
   to = (to || []).map(norm_).filter(e => e.indexOf('@') > 0 && e.indexOf('correo_de') !== 0);
   if (!to.length) return;
-  const boton = cta ? `<p style="margin:24px 0"><a href="${CONFIG.APP_URL.replace(/\/?$/, '/')}${vista ? '#' + vista : ''}" style="background:#12679A;color:#fff;padding:11px 18px;border-radius:10px;text-decoration:none;font-weight:600">${cta}</a></p>` : '';
+  const boton = cta ? `<p style="margin:24px 0"><a href="${urlBoton || (CONFIG.APP_URL.replace(/\/?$/, '/') + (vista ? '#' + vista : ''))}" style="background:#12679A;color:#fff;padding:11px 18px;border-radius:10px;text-decoration:none;font-weight:600">${cta}</a></p>` : '';
   const body = `<div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.55;color:#152433;max-width:560px">
     <div style="height:6px;border-radius:6px;background:linear-gradient(90deg,#E58A00,#D9007A,#3A2A85,#8E5A32,#12679A,#D9312B,#55595D,#25995A)"></div>
     <p style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#6E8193;margin-top:18px">Voluntariado Arrupe</p>
