@@ -15,11 +15,11 @@ const CONFIG = {
   // ID de cliente OAuth de Google (Google Cloud > APIs y servicios > Credenciales). Ver GUIA.md.
   CLIENT_ID: '237021277501-7hj405nb3l88f9vhngghkg6igd0tae3m.apps.googleusercontent.com',
   // Correos del Servicio de Pastoral: acceso total y únicos que pueden abrir los documentos.
-  PASTORAL: ['andresgarcia@fundacionsafa.es', 'CORREO_DE_LORENA@fundacionsafa.es'],
+  PASTORAL: ['andresgarcia@fundacionsafa.es', 'ldimanuel@fundacionsafa.es'],
   // Dirección pública de la app en GitHub Pages (para los enlaces de los correos).
   APP_URL: 'https://agarcia-poz.github.io/voluntariado-arrupe/',
   // URL o ID del formulario de inscripción de Google (para conectarFormulario()).
-  FORM: '',
+  FORM: 'https://docs.google.com/forms/d/1IE4z_QOV2n1IdxytTTrS6LG4bCb7vegyaJQ5AE4og9U/edit',
   // Horas de referencia para el certificado (se muestra como meta orientativa).
   HORAS_REFERENCIA: 20,
   REMITENTE: 'Voluntariado Arrupe · Pastoral CUSAFA'
