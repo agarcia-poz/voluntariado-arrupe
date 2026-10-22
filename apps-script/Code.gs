@@ -38,7 +38,7 @@ const TIPOS_DOC = {
 
 const HOJAS = {
   Usuarios: ['email', 'nombre', 'rol', 'estado', 'curso', 'coordEnts', 'alta', 'telefono', 'emailContacto', 'emergenciaNombre', 'emergenciaTelefono', 'avisos', 'ultimoAcceso'],
-  Entidades: ['id', 'nombre', 'lugar', 'etiqueta', 'color', 'descripcion', 'horario', 'cupo', 'ig', 'activa', 'claves'],
+  Entidades: ['id', 'nombre', 'lugar', 'etiqueta', 'color', 'descripcion', 'horario', 'cupo', 'ig', 'activa', 'claves', 'whatsapp', 'editadoPor', 'editado'],
   Asignaciones: ['email', 'entidad', 'estado', 'fecha', 'origen'],
   Inscripciones: ['id', 'fecha', 'nombre', 'email', 'curso', 'preferencias', 'preferenciasTexto', 'motivo', 'estado', 'entidad', 'gestionadoPor'],
   Documentos: ['email', 'tipo', 'estado', 'fileId', 'archivo', 'fecha', 'revisadoPor', 'fechaRevision', 'nota'],
@@ -313,16 +313,39 @@ const ACCIONES = {
     puedeCoordinar_(me, ent.id);
     const u = findUser_(norm_(d.email));
     if (!u) throw httpErr_('Persona no encontrada');
+    const msg = String(d.mensaje || '').trim();
+    if (msg.length < 20) throw httpErr_('Escribe una breve presentación antes de enviar');
+    if (msg.length > 1500) throw httpErr_('La presentación es demasiado larga (máximo 1500 caracteres)');
+    const wa = String(d.whatsapp || '').trim() || String(ent.whatsapp || '');
+    if (wa && !/^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+/.test(wa)) throw httpErr_('El enlace del grupo de WhatsApp debe empezar por https://chat.whatsapp.com/');
+    if (wa && wa !== String(ent.whatsapp || '')) withLock_(() => updateWhere_('Entidades', e => e.id === ent.id, { whatsapp: wa, editadoPor: me.email, editado: new Date() }));
+    const parrafos = esc_(msg).split(/\n{2,}/).map(x => '<p>' + x.replace(/\n/g, '<br>') + '</p>').join('');
+    const waHtml = wa
+      ? `<p>Tenemos un <b>grupo de WhatsApp</b> del voluntariado de ${esc_(ent.nombre)} para organizarnos. Únete con este enlace:</p><p><a href="${esc_(wa)}" style="display:inline-block;background:#25D366;color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:600">Unirme al grupo de WhatsApp</a></p>`
+      : `<p>Vamos a crear un <b>grupo de WhatsApp</b> del voluntariado de ${esc_(ent.nombre)} para organizarnos. Para poder añadirte, comprueba que tu teléfono está en la app, en <b>Mis datos</b>.</p>`;
     mail_([u.email], 'Bienvenida a ' + ent.nombre,
-      `<p>Hola, ${esc_(u.nombre.split(' ')[0])}:</p><p>Soy ${esc_(me.nombre)} y coordino el voluntariado de <b>${esc_(ent.nombre)}</b>. ¡Qué alegría contar contigo!</p>
-       <p><b>Horario:</b> ${esc_(ent.horario)}<br><b>Lugar:</b> ${esc_(ent.lugar)}</p>
-       <p>Antes de empezar, entra en la app para subir tu certificado de delitos de naturaleza sexual y firmar el compromiso de voluntariado. Puedes escribirme respondiendo a este correo.</p>`,
+      `<p>Hola, ${esc_(u.nombre.split(' ')[0])}:</p>${parrafos}
+       <p style="margin-top:18px"><b>Horario:</b> ${esc_(ent.horario)}<br><b>Lugar:</b> ${esc_(ent.lugar)}</p>
+       ${waHtml}
+       <p>Antes de empezar, entra en la app para subir tu certificado de delitos de naturaleza sexual y firmar el compromiso de voluntariado. Puedes escribirme respondiendo a este correo.</p>
+       <p style="margin-bottom:0">${esc_(me.nombre)}<br><span style="color:#6E8193;font-size:13px">Coordinación · ${esc_(ent.nombre)}</span></p>`,
       'Abrir la app', 'vinicio', me.email);
     withLock_(() => updateWhere_('Asignaciones', r => r.email === u.email && r.entidad === ent.id && r.estado === 'activa', { origen: 'bienvenida enviada' }));
     log_(me, 'darBienvenida', u.email);
     return bootstrap_(me);
   },
 
+  guardarInfoEntidad: (me, d) => {
+    const ent = entidad_(d.entidad);
+    puedeCoordinar_(me, ent.id);
+    const wa = String(d.whatsapp || '').trim();
+    if (wa && !/^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+/.test(wa)) throw httpErr_('El enlace del grupo de WhatsApp debe empezar por https://chat.whatsapp.com/');
+    const desc = String(d.descripcion || '').trim(), hor = String(d.horario || '').trim(), lug = String(d.lugar || '').trim();
+    if (!hor || !lug) throw httpErr_('El horario y el lugar no pueden quedar vacíos');
+    withLock_(() => updateWhere_('Entidades', e => e.id === ent.id, { descripcion: desc.slice(0, 1200) || ent.descripcion, horario: hor.slice(0, 300), lugar: lug.slice(0, 200), whatsapp: wa, editadoPor: me.email, editado: new Date() }));
+    log_(me, 'guardarInfoEntidad', ent.id);
+    return bootstrap_(me);
+  },
   invitarVoluntarios: (me, d) => {
     const ent = entidad_(d.entidad);
     puedeCoordinar_(me, ent.id);
@@ -350,17 +373,20 @@ const ACCIONES = {
   // ── pastoral ──
   asignarInscripcion: (me, d) => {
     pastoral_(me);
-    const ent = entidad_(d.entidad);
+    const ids = [...new Set((d.entidades && d.entidades.length ? d.entidades : [d.entidad]).filter(Boolean))];
+    if (!ids.length) throw httpErr_('Elige al menos una entidad');
+    if (ids.length > 3) throw httpErr_('Como máximo tres entidades a la vez');
+    const ents = ids.map(entidad_);
     const ins = rows_('Inscripciones').find(r => String(r.id) === String(d.id));
     if (!ins) throw httpErr_('Inscripción no encontrada');
     if (!ins.email) throw httpErr_('Esta inscripción no tiene correo. Añádelo en la hoja Inscripciones.');
     withLock_(() => {
-      updateWhere_('Inscripciones', r => String(r.id) === String(d.id), { estado: 'asignada', entidad: ent.id, gestionadoPor: me.email });
+      updateWhere_('Inscripciones', r => String(r.id) === String(d.id), { estado: 'asignada', entidad: ids.join(','), gestionadoPor: me.email });
       upsertUser_(ins.email, { nombre: ins.nombre, curso: ins.curso, estado: 'activo' });
-      asignar_(ins.email, ent.id, 'inscripción');
+      ids.forEach(id => asignar_(ins.email, id, 'inscripción'));
     });
-    avisarAsignacion_(ins.email, ins.nombre, ent);
-    log_(me, 'asignarInscripcion', ins.email + ' → ' + ent.id);
+    ents.forEach(ent => avisarAsignacion_(ins.email, ins.nombre, ent));
+    log_(me, 'asignarInscripcion', ins.email + ' → ' + ids.join(','));
     return bootstrap_(me);
   },
   estadoInscripcion: (me, d) => {
@@ -392,6 +418,7 @@ const ACCIONES = {
     withLock_(() => {
       upsertUser_(email, { nombre: String(d.nombre || '').trim() || email, curso: d.curso || '', rol: d.rol, estado: d.estado, coordEnts: coordEnts.join(',') });
       const actuales = rows_('Asignaciones').filter(a => a.email === email && a.estado === 'activa').map(a => a.entidad);
+      coordEnts.forEach(x => { if (asig.indexOf(x) < 0) asig.push(x); }); // quien coordina también sirve en esa entidad
       asig.filter(x => actuales.indexOf(x) < 0).forEach(x => asignar_(email, x, 'pastoral'));
       actuales.filter(x => asig.indexOf(x) < 0).forEach(x => updateWhere_('Asignaciones', r => r.email === email && r.entidad === x && r.estado === 'activa', { estado: 'baja', fecha: new Date() }));
     });
@@ -419,7 +446,7 @@ const ACCIONES = {
     if (!id) throw httpErr_('Falta el identificador corto');
     const rec = {
       id, nombre: d.nombre, lugar: d.lugar, etiqueta: d.etiqueta, color: d.color || 'blue', descripcion: d.descripcion,
-      horario: d.horario, cupo: Number(d.cupo) || 0, ig: d.ig || '', activa: d.activa === false ? 'no' : 'sí', claves: d.claves || ''
+      horario: d.horario, cupo: Number(d.cupo) || 0, ig: d.ig || '', activa: d.activa === false ? 'no' : 'sí', claves: d.claves || '', whatsapp: d.whatsapp || '', editadoPor: me.email, editado: new Date()
     };
     if (!rec.nombre) throw httpErr_('Falta el nombre');
     withLock_(() => {
@@ -659,7 +686,9 @@ function bootstrap_(me) {
     id: e.id, nombre: e.nombre, lugar: e.lugar, etiqueta: e.etiqueta, color: e.color, descripcion: e.descripcion,
     horario: e.horario, cupo: Number(e.cupo) || 0, ig: e.ig, activa: e.activa !== 'no', claves: me.rol === 'pastoral' ? e.claves : undefined,
     coordinadores: users.filter(u => splitList_(u.coordEnts).indexOf(e.id) >= 0 && u.estado === 'activo').map(u => nombreCorto_(u.nombre)),
-    ocupadas: asigs.filter(a => a.entidad === e.id && a.estado === 'activa').length
+    ocupadas: asigs.filter(a => a.entidad === e.id && a.estado === 'activa').length,
+    whatsapp: (me.rol === 'pastoral' || splitList_(me.coordEnts).indexOf(e.id) >= 0 || asigs.some(a => a.email === me.email && a.entidad === e.id && a.estado === 'activa')) ? (e.whatsapp || '') : '',
+    editadoPor: e.editadoPor ? nombreCorto_((users.find(u => u.email === e.editadoPor) || {}).nombre || e.editadoPor) : '', editado: iso_(e.editado)
   }));
 
   const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
@@ -751,7 +780,7 @@ function bootstrap_(me) {
       })),
       inscripciones: rows_('Inscripciones').map(r => ({
         id: String(r.id), fecha: iso_(r.fecha), nombre: r.nombre, email: r.email, curso: r.curso,
-        preferencias: splitList_(r.preferencias), preferenciasTexto: r.preferenciasTexto, motivo: r.motivo, estado: r.estado, entidad: r.entidad
+        preferencias: splitList_(r.preferencias), preferenciasTexto: r.preferenciasTexto, motivo: r.motivo, estado: r.estado, entidad: r.entidad, entidades: splitList_(r.entidad)
       })).reverse(),
       sesiones: sesiones_(asis, byEmail).slice(0, 40),
       invitaciones: rows_('Invitaciones').map(r => ({
@@ -815,6 +844,8 @@ function currentUser_(who) {
     u.rol = 'pastoral'; u.estado = 'activo';
   }
   if (u.estado === 'baja') throw authErr_('Tu cuenta está dada de baja. Escribe al Servicio de Pastoral.');
+  const sinPlaza = splitList_(u.coordEnts).filter(e => !rows_('Asignaciones').some(a => a.email === who.email && a.entidad === e && a.estado === 'activa'));
+  if (sinPlaza.length && u.estado === 'activo') withLock_(() => sinPlaza.forEach(e => asignar_(who.email, e, 'coordinación')));
   if (iso_(u.ultimoAcceso) !== hoyISO_(0)) { try { updateWhere_('Usuarios', r => r.email === who.email, { ultimoAcceso: new Date() }); u.ultimoAcceso = new Date(); } catch (e) { } }
   u.foto = who.foto;
   return u;
@@ -997,6 +1028,7 @@ function aplicarInvitacion_(email, nombre, inv) {
     rol: u && u.rol === 'pastoral' ? 'pastoral' : (inv.rol || 'coord'),
     estado: 'activo', coordEnts: coordEnts.join(',')
   });
+  ents.forEach(e => { if (!rows_('Asignaciones').some(a => a.email === email && a.entidad === e && a.estado === 'activa')) asignar_(email, e, 'coordinación'); });
   updateWhere_('Invitaciones', r => String(r.codigo) === String(inv.codigo), { estado: 'usada', usadoPor: email, usadoEn: new Date() });
 }
 // Invitación de voluntariado: da acceso a la cuenta que la usa. Si es otra cuenta distinta del correo invitado, la plaza pasa a esa cuenta.

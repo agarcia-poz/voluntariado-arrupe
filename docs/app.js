@@ -29,6 +29,7 @@ const I = {
   compass: '<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/>',
   chart: '<path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/>',
   ext: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  chat: '<path d="M21 11.5a8.4 8.4 0 0 1-12.6 7.3L3 21l2.2-5.2A8.5 8.5 0 1 1 21 11.5z"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
   pen: '<path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/>'
@@ -43,7 +44,7 @@ const IG = 'https://www.instagram.com/unisafa/';
 
 /* ───────── estado ───────── */
 let TOKEN = null, D = null;
-const S = { gal: {}, cf: {}, resign: false, tf: null, delT: null, delM: null, upMsg: '', fent: null, view: null, ent: null, leaving: null, cent: null, assigning: null, insFilter: 'nueva', q: '', editP: null, editE: null, editN: null, delN: null, delSes: null, rejecting: null, att: null, err: '' };
+const S = { welcome: null, wMsg: '', wWa: undefined, editInfo: false, gal: {}, cf: {}, resign: false, tf: null, delT: null, delM: null, upMsg: '', fent: null, view: null, ent: null, leaving: null, cent: null, assigning: null, insFilter: 'nueva', q: '', editP: null, editE: null, editN: null, delN: null, delSes: null, rejecting: null, att: null, err: '' };
 try { TOKEN = sessionStorage.getItem('arrupe-token'); } catch (e) { }
 let CODE = null;
 try {
@@ -82,7 +83,7 @@ const DEMO_ENTS = [
   ['apoyo', 'Apoyo Escolar SAFA Úbeda', 'EE.PP. SAFA Úbeda', 'Infancia', 'blue', 'Refuerzo escolar a alumnado de Primaria. Tu primera aula real, acompañando a quien más lo necesita.', 'L 16–18 h · M 16–17 h · X 16–17 h · J 16–18 h.', 14, 'https://www.instagram.com/reel/DR4fdeyjAAf/', ['M.ª Jesús P.', 'M.ª Victoria C.'], 9],
   ['ilu', 'Proyecto Ilusión Baeza', 'Baeza', 'Infancia', 'green', 'Tardes de ocio educativo con menores. Juego, convivencia y mucha energía.', '1–2 sábados al mes, 17:00–21:00.', 12, 'https://www.instagram.com/reel/DR4RtaHjM3N/', ['Gustavo P.', 'María R.'], 8],
   ['apro', 'APROMPSI Úbeda', 'Úbeda', 'Diversidad', 'teal', 'Actividades con personas con discapacidad intelectual: fútbol, zumba, teatro y baile.', 'Jueves: fútbol 16–18 h · zumba 17–18 h · teatro y baile 18–20 h.', 8, 'https://www.instagram.com/reel/DR39H0eDBh8/', ['Lorena P.', 'Ramón S.'], 5]
-].map(e => ({ id: e[0], nombre: e[1], lugar: e[2], etiqueta: e[3], color: e[4], descripcion: e[5], horario: e[6], cupo: e[7], ig: e[8], activa: true, coordinadores: e[9], ocupadas: e[10] }));
+].map(e => ({ id: e[0], nombre: e[1], lugar: e[2], etiqueta: e[3], color: e[4], descripcion: e[5], horario: e[6], cupo: e[7], ig: e[8], activa: true, coordinadores: e[9], ocupadas: e[10], whatsapp: '', editadoPor: e[0] === 'hogar' ? 'Miguel Á.' : '', editado: e[0] === 'hogar' ? dIso(-3) : '' }));
 const DOW = iso => ((new Date(iso + 'T12:00:00Z').getUTCDay() + 6) % 7) + 1;
 function demoOcc(t, dias) { const out = []; for (let i = 0; i <= dias; i++) { const f = dIso(i); if (t.tipo === 'fecha' ? t.fecha === f : DOW(f) === t.dia) out.push(f); } return out; }
 function demoTurnos() {
@@ -219,10 +220,11 @@ function demoApi(action, d) {
     }
     case 'borrarSesion': Object.values(D2.coord).forEach(C => { C.sesiones = C.sesiones.filter(s => s.sesion !== d.sesion); }); return D2;
     case 'recordarDocumentos': return { enviados: D2.coord[d.entidad].equipo.filter(p => p.cert !== 'ok' || p.comp !== 'ok').length };
-    case 'darBienvenida': D2.coord[d.entidad].equipo.forEach(p => { if (p.email === d.email) p.nuevo = false; }); return D2;
+    case 'darBienvenida': D2.coord[d.entidad].equipo.forEach(p => { if (p.email === d.email) p.nuevo = false; }); if (d.whatsapp) D2.entidades.forEach(e => { if (e.id === d.entidad) e.whatsapp = d.whatsapp; }); return D2;
+    case 'guardarInfoEntidad': D2.entidades.forEach(e => { if (e.id === d.entidad) Object.assign(e, { horario: d.horario, lugar: d.lugar, descripcion: d.descripcion || e.descripcion, whatsapp: d.whatsapp, editadoPor: short(me.nombre), editado: todayISO() }); }); return D2;
     case 'guardarMisDatos': Object.assign(me, d); return D2;
     case 'invitarVoluntarios': D2.coord[d.entidad].equipo.forEach(p => { if (d.emails.includes(p.email)) p.invitacion = 'enviada'; }); return D2;
-    case 'asignarInscripcion': D2.pastoral.inscripciones.forEach(i => { if (i.id === d.id) { i.estado = 'asignada'; i.entidad = d.entidad; } }); return D2;
+    case 'asignarInscripcion': D2.pastoral.inscripciones.forEach(i => { if (i.id === d.id) { i.estado = 'asignada'; i.entidades = d.entidades; i.entidad = d.entidades.join(','); } }); return D2;
     case 'estadoInscripcion': D2.pastoral.inscripciones.forEach(i => { if (i.id === d.id) i.estado = d.estado; }); return D2;
     case 'guardarPersona': { let p = D2.pastoral.personas.find(x => x.email === d.email); if (!p) { p = { email: d.email, alta: todayISO(), asignaciones: [], docs: { cert: { estado: 'pend', url: '' }, comp: { estado: 'pend', url: '' } }, horas: 0, telefono: '', emergencia: '', compromiso: null }; D2.pastoral.personas.push(p); }
       Object.assign(p, { nombre: d.nombre, curso: d.curso, rol: d.rol, estado: d.estado, coordEnts: d.coordEnts, asignaciones: d.asignaciones.map(e => ({ entidad: e, estado: 'activa' })) }); return D2; }
@@ -461,7 +463,7 @@ function vVinicio() {
      <div class="kpi"><b class="tnum">${ents.length}</b><span>${ents.length === 1 ? 'voluntariado' : 'voluntariados'}</span></div>
      <div class="kpi ${done < 2 ? 'alert' : ''}"><b class="tnum">${done}/2</b><span>documentos validados</span></div></div>
   ${falta.length ? `<div class="note">${ic('file', 18)}<span>Te falta: <b>${falta.map(t => D.config.tiposDoc[t].toLowerCase()).join(' y ')}</b>. <button class="btn primary sm" data-go="docs" style="margin-left:6px">Ir a documentos</button></span></div>` : ''}
-  ${ents.length ? `<div class="grid g2">${ents.map(id => { const e = E(id), h = horasPor(id); return `<div class="card" style="--c:${cvar(e.color)}"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">${chip(id)}<span class="small muted tnum">${nf(h)} h</span></div><h2>${esc(e.nombre)}</h2><p class="muted small">${esc(e.horario)}</p><div class="bar"><i style="width:${Math.min(100, h / ref * 100)}%"></i></div><span class="hint">Referencia de ${ref} h para el certificado</span><button class="btn ghost sm" data-ent="${esc(id)}" style="justify-self:start">Ver detalles</button></div>`; }).join('')}</div>`
+  ${ents.length ? `<div class="grid g2">${ents.map(id => { const e = E(id), h = horasPor(id); return `<div class="card" style="--c:${cvar(e.color)}"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">${chip(id)}<span class="small muted tnum">${nf(h)} h</span></div><h2>${esc(e.nombre)}</h2><p class="muted small">${esc(e.horario)}</p><div class="bar"><i style="width:${Math.min(100, h / ref * 100)}%"></i></div><span class="hint">Referencia de ${ref} h para el certificado</span><div class="actions"><button class="btn ghost sm" data-ent="${esc(id)}">Ver detalles</button>${e.whatsapp ? `<a class="btn ghost sm" href="${safeUrl(e.whatsapp)}" target="_blank" rel="noopener">${ic('chat', 16)}Grupo de WhatsApp</a>` : ''}</div></div>`; }).join('')}</div>`
     : `<div class="empty">Aún no tienes un voluntariado asignado. <button class="btn primary sm" data-go="explorar">Descubre dónde servir</button></div>`}
   ${sol.length ? `<div class="card"><h3>Solicitudes en curso</h3><div class="chips">${sol.map(a => chip(a.entidad)).join('')}</div><p class="hint">Pastoral te responderá por correo.</p></div>` : ''}
   <div class="grid g2">
@@ -502,7 +504,7 @@ function vHoras() {
 /* --- coordinación --- */
 function centSel() {
   const ids = caps().coordIds;
-  if (!S.cent || !ids.includes(S.cent)) S.cent = ids[0];
+  if (!S.cent || !ids.includes(S.cent)) { S.cent = ids[0]; S.editInfo = false; S.welcome = null; }
   return ids.length > 1 ? `<div class="selector"><label for="centSel" class="small muted">Entidad</label><select id="centSel">${ids.map(id => `<option value="${esc(id)}" ${id === S.cent ? 'selected' : ''}>${esc(E(id).nombre)}</option>`).join('')}</select></div>` : '';
 }
 function vCinicio() {
@@ -513,7 +515,7 @@ function vCinicio() {
     `<div class="kpis"><div class="kpi"><b class="tnum">${t.length}</b><span>voluntarios · ${e.cupo} plazas</span></div>
     <div class="kpi ${pend.length ? 'alert' : ''}"><b class="tnum">${pend.length}</b><span>con documentación incompleta</span></div>
     <div class="kpi"><b class="tnum">${nf(sum(t, p => p.horas))} h</b><span>de servicio este curso</span></div></div>
-  ${nuevos.length ? `<div class="card"><h2>Nuevas incorporaciones</h2><div class="list">${nuevos.map(n => `<div class="row"><div class="av" style="background:${cvar(e.color)}">${esc(initials(n.nombre))}</div><div class="grow"><b>${esc(n.nombre)}</b><span class="muted small">${esc(n.curso)} · ${esc(n.email)}</span></div><button class="btn primary sm" data-welcome="${esc(n.email)}">${ic('mail', 16)}Enviar bienvenida</button></div>`).join('')}</div><p class="hint">El correo sale con tu dirección para que te respondan a ti.</p></div>` : ''}
+  ${nuevos.length ? `<div class="card"><h2>Nuevas incorporaciones</h2><div class="list">${nuevos.map(n => `<div class="row"><div class="av" style="background:${cvar(e.color)}">${esc(initials(n.nombre))}</div><div class="grow"><b>${esc(n.nombre)}</b><span class="muted small">${esc(n.curso)} · ${esc(n.email)}</span></div>${S.welcome === n.email ? '' : `<button class="btn primary sm" data-welcome="${esc(n.email)}">${ic('mail', 16)}Escribir bienvenida</button>`}</div>${S.welcome === n.email ? welcomeComposer(n, e) : ''}`).join('')}</div></div>` : ''}
   <div class="grid g2">
     <div class="card"><h2>Documentación pendiente</h2>
       ${pend.length ? `<div class="list">${pend.map(p => `<div class="row"><div class="grow"><b>${esc(p.nombre)}</b><span class="small muted">${esc(p.curso)}</span></div><div class="chips">${p.cert !== 'ok' ? `<span class="pill ${DOC[p.cert][0]}">Certificado</span>` : ''}${p.comp !== 'ok' ? `<span class="pill ${DOC[p.comp][0]}">Compromiso</span>` : ''}</div></div>`).join('')}</div>
@@ -529,6 +531,19 @@ function appPill(p) {
   if (p.invitacion === 'enviada') return '<span class="pill info">Invitación enviada</span>';
   if (p.invitacion === 'usada') return '<span class="pill ok">Activada</span>';
   return '<span class="pill warn">Sin invitar</span>';
+}
+function welcomeComposer(n, e) {
+  const first = String(n.nombre || '').split(' ')[0];
+  return `<div class="card" style="border-color:var(--brand);margin-bottom:12px">
+    <h3>Bienvenida para ${esc(first)}</h3>
+    <div class="field"><label for="wMsg">Tu presentación</label>
+      <textarea id="wMsg" maxlength="1500" style="min-height:150px" placeholder="Preséntate en pocas líneas: quién eres, qué estudias, cuánto tiempo llevas en ${esc(e.nombre)} y qué te gustaría que viviera en este voluntariado.">${esc(S.wMsg || '')}</textarea>
+      <span class="hint">Se envía con tu nombre. Lo que escribas va justo después del saludo “Hola, ${esc(first)}:”.</span></div>
+    <button class="signout" data-act="w-ejemplo" style="justify-self:start">Empezar con un ejemplo</button>
+    <div class="field"><label for="wWa">Enlace del grupo de WhatsApp (opcional)</label><input type="text" id="wWa" value="${esc(S.wWa ?? e.whatsapp ?? '')}" placeholder="https://chat.whatsapp.com/…">
+      <span class="hint">${e.whatsapp ? 'Es el enlace guardado para tu entidad.' : 'Si aún no existe el grupo, el correo avisa de que se va a crear y pide que tenga su teléfono en Mis datos.'} El enlace se guarda para el resto de coordinadores.</span></div>
+    <div class="note small">${ic('mail', 18)}<span>Además de tu presentación, el correo incluye el horario y el lugar, el aviso del grupo de WhatsApp y el recordatorio de subir el certificado y firmar el compromiso. Si te responden, la respuesta te llega a ti.</span></div>
+    <div class="actions"><button class="btn primary" data-sendwelcome="${esc(n.email)}">${ic('mail', 18)}Enviar bienvenida</button><button class="btn ghost" data-act="w-cancel">Cancelar</button></div></div>`;
 }
 function vEquipo() {
   const sel = centSel(), e = E(S.cent), t = D.coord[S.cent].equipo, me = D.me.email;
@@ -593,8 +608,11 @@ function vIns() {
   return header('Servicio de Pastoral', 'Inscripciones', 'Llegan solas desde el formulario de Google y os avisamos por correo. Preselecciona y envía cada persona a la coordinación que mejor encaje.') +
     `<div class="filters" role="group" aria-label="Filtrar inscripciones">${F.map(([k, l]) => `<button data-insf="${k}" aria-pressed="${S.insFilter === k}">${l} · ${all.filter(i => i.estado === k).length}</button>`).join('')}</div>
     ${list.length ? `<div class="grid">${list.map(i => {
-      const st = i.estado === 'asignada' ? `<span class="pill ok">Enviada a ${esc(E(i.entidad).nombre)}</span>` : i.estado === 'nueva' ? '<span class="pill warn">Nueva</span>' : i.estado === 'en_espera' ? '<span class="pill info">En espera</span>' : '<span class="pill bad">Descartada</span>';
-      const assign = S.assigning === i.id ? `<div class="form-grid" style="align-items:end"><div class="field"><label for="sel-${esc(i.id)}">Enviar a la coordinación de</label><select id="sel-${esc(i.id)}">${D.entidades.filter(e => e.activa).map(e => `<option value="${esc(e.id)}" ${i.preferencias[0] === e.id ? 'selected' : ''}>${esc(e.nombre)}${i.preferencias.includes(e.id) ? ' · la eligió' : ''} (${e.ocupadas}/${e.cupo})</option>`).join('')}</select></div><div class="actions"><button class="btn primary" data-assign="${esc(i.id)}">${ic('arrow', 18)}Enviar</button><button class="btn ghost" data-act="cancel-assign">Cancelar</button></div></div>`
+      const ie = (i.entidades && i.entidades.length) ? i.entidades : String(i.entidad || '').split(',').filter(Boolean);
+      const st = i.estado === 'asignada' ? `<span class="pill ok">Enviada a ${esc(ie.map(x => E(x).nombre).join(' y '))}</span>` : i.estado === 'nueva' ? '<span class="pill warn">Nueva</span>' : i.estado === 'en_espera' ? '<span class="pill info">En espera</span>' : '<span class="pill bad">Descartada</span>';
+      const assign = S.assigning === i.id ? `<div style="display:grid;gap:10px"><span style="font-weight:600;font-size:.88rem">Enviar a la coordinación de (puedes marcar más de una)</span>
+        <div class="checks">${D.entidades.filter(e => e.activa).map(e => `<label><input type="checkbox" data-asig="${esc(e.id)}" ${i.preferencias.includes(e.id) ? 'checked' : ''}>${esc(e.nombre)}${i.preferencias.includes(e.id) ? ' <span class="hint">· la eligió</span>' : ''} <span class="hint tnum">${e.ocupadas}/${e.cupo}</span></label>`).join('')}</div>
+        <div class="actions"><button class="btn primary" data-assign="${esc(i.id)}">${ic('arrow', 18)}Enviar</button><button class="btn ghost" data-act="cancel-assign">Cancelar</button></div></div>`
         : (i.estado !== 'asignada' ? `<div class="actions"><button class="btn primary sm" data-pre="${esc(i.id)}">Preseleccionar</button>${i.estado !== 'en_espera' ? `<button class="btn ghost sm" data-insst="${esc(i.id)}|en_espera">Dejar en espera</button>` : ''}${i.estado !== 'descartada' ? `<button class="btn ghost sm" data-insst="${esc(i.id)}|descartada">Descartar</button>` : `<button class="btn ghost sm" data-insst="${esc(i.id)}|nueva">Recuperar</button>`}</div>` : '');
       return `<div class="card"><div style="display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap"><div class="av" style="background:var(--brand)">${esc(initials(i.nombre))}</div><div style="flex:1 1 220px;min-width:0;display:grid;gap:2px"><h3>${esc(i.nombre || '(sin nombre)')}</h3><span class="small muted">${esc(i.curso)} · ${esc(i.email || 'sin correo')} · ${fmt(i.fecha)}</span></div>${st}</div>
         ${i.motivo ? `<p>“${esc(i.motivo)}”</p>` : ''}<div class="chips"><span class="small muted">Prefiere:</span>${i.preferencias.length ? i.preferencias.map(chip).join('') : `<span class="small">${esc(i.preferenciasTexto || '—')}</span>`}</div>${assign}</div>`;
@@ -708,6 +726,7 @@ function editEntidad() {
       <div class="field wide"><label for="eDesc">Descripción</label><textarea id="eDesc">${esc(e.descripcion)}</textarea></div>
       <div class="field wide"><label for="eHorario">Horario</label><input type="text" id="eHorario" value="${esc(e.horario)}"></div>
       <div class="field wide"><label for="eIg">Enlace a la publicación de Instagram</label><input type="text" id="eIg" value="${esc(e.ig)}" placeholder="https://www.instagram.com/reel/…"></div>
+      <div class="field wide"><label for="eWa">Enlace del grupo de WhatsApp</label><input type="text" id="eWa" value="${esc(e.whatsapp || '')}" placeholder="https://chat.whatsapp.com/…"></div>
       <div class="field wide"><label for="eClaves">Palabras que la identifican en el formulario</label><input type="text" id="eClaves" value="${esc(e.claves || '')}" placeholder="separadas por comas"><span class="hint">Sirven para reconocer la preferencia que marcan en el formulario de inscripción.</span></div>
       <label class="check wide" for="eActiva"><input type="checkbox" id="eActiva" ${e.activa ? 'checked' : ''}>Visible para el alumnado</label>
     </div>
@@ -766,7 +785,18 @@ function confirmadosEn(fecha) { const C = D.coord && D.coord[S.cent]; if (!C || 
 function vChorario() {
   const sel = centSel(), e = E(S.cent), C = D.coord[S.cent], T = C.turnos || [];
   const f = S.tf || (S.tf = { tipo: 'semanal', dia: 1, fecha: todayISO(), inicio: '17:00', fin: '18:00', lugar: e.lugar, nota: '' });
-  return header('Coordinación', 'Horarios', `Fija los turnos de ${esc(e.nombre)}. Cada persona recibe un recordatorio por correo el día antes, con botones para confirmar o avisar si no puede.`, sel) +
+  const info = S.editInfo ? `<div class="card" style="border-color:var(--brand)"><h2>Información de ${esc(e.nombre)}</h2>
+      <div class="form-grid"><div class="field wide"><label for="iHor">Horario general</label><input type="text" id="iHor" value="${esc(e.horario)}"></div>
+      <div class="field wide"><label for="iLug">Lugar</label><input type="text" id="iLug" value="${esc(e.lugar)}"></div>
+      <div class="field wide"><label for="iDesc">Descripción para el alumnado</label><textarea id="iDesc">${esc(e.descripcion)}</textarea></div>
+      <div class="field wide"><label for="iWa">Enlace del grupo de WhatsApp</label><input type="text" id="iWa" value="${esc(e.whatsapp || '')}" placeholder="https://chat.whatsapp.com/…"><span class="hint">Solo lo ve quien forma parte de la entidad.</span></div></div>
+      <div class="actions"><button class="btn primary" data-act="save-info">${ic('check', 18)}Guardar</button><button class="btn ghost" data-act="cancel-info">Cancelar</button></div></div>`
+    : `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h2>Información de ${esc(e.nombre)}</h2><button class="btn ghost sm" data-act="edit-info">${ic('pen', 16)}Editar</button></div>
+      <div class="list"><div class="row"><div class="grow"><b>Horario general</b><span class="muted small">${esc(e.horario)}</span></div></div>
+      <div class="row"><div class="grow"><b>Lugar</b><span class="muted small">${esc(e.lugar)}</span></div></div>
+      <div class="row"><div class="grow"><b>Grupo de WhatsApp</b><span class="muted small">${e.whatsapp ? `<a class="link" href="${safeUrl(e.whatsapp)}" target="_blank" rel="noopener">Abrir el grupo</a>` : 'Sin enlace todavía'}</span></div></div></div>
+      <p class="hint">Esta información y los turnos son comunes a toda la coordinación de la entidad: lo que cambies lo ven el resto de coordinadores y tu equipo.${e.editadoPor ? ` Última edición: ${esc(e.editadoPor)}, ${fmt(e.editado)}.` : ''}</p></div>`;
+  return header('Coordinación', 'Horarios', `Fija los turnos de ${esc(e.nombre)}. Cada persona recibe un recordatorio por correo el día antes, con botones para confirmar o avisar si no puede.`, sel) + info +
   `<div class="grid g2"><div class="card"><h2>Turnos y encuentros</h2>
     ${T.length ? `<div class="list">${T.map(t => `<div class="row"><div class="grow"><b>${turnoTxt(t)}</b><span class="muted small">${esc(t.lugar || e.lugar)}${t.nota ? ' · ' + esc(t.nota) : ''}${t.tipo === 'semanal' ? ' · ' + (t.apuntados.length ? 'van: ' + esc(t.apuntados.join(', ')) : 'nadie lo ha elegido aún: se avisa a todo el equipo') : ' · se avisa a todo el equipo'}</span></div>
       ${S.delT === t.id ? `<span class="actions"><button class="btn danger sm" data-delturno="${esc(t.id)}">Quitar</button><button class="btn ghost sm" data-act="cancel-delt">No</button></span>` : `<button class="btn ghost sm" data-askdelt="${esc(t.id)}">Quitar</button>`}</div>`).join('')}</div>` : '<p class="muted small">Todavía no hay turnos. Añade el primero.</p>'}
@@ -941,7 +971,13 @@ root.addEventListener('click', async ev => {
   if (d.ent) { S.view = 'explorar'; S.ent = d.ent; S.leaving = null; render.keepScroll = false; return render(); }
   if (d.insf) { S.insFilter = d.insf; S.assigning = null; return render(); }
   if (d.pre) { S.assigning = d.pre; return render(); }
-  if (d.assign) { const ent = $('sel-' + d.assign).value; S.assigning = null; return run('asignarInscripcion', { id: d.assign, entidad: ent }, `Enviada a ${E(ent).nombre}. Les llega un correo a la persona y a su coordinación.`); }
+  if (d.assign) {
+    const ents = [...root.querySelectorAll('[data-asig]:checked')].map(x => x.dataset.asig);
+    if (!ents.length) return toast('Marca al menos una entidad');
+    if (ents.length > 3) return toast('Como máximo tres entidades a la vez');
+    S.assigning = null;
+    return run('asignarInscripcion', { id: d.assign, entidades: ents }, `Enviada a ${ents.map(x => E(x).nombre).join(' y ')}. Le llega un correo a la persona y a cada coordinación.`);
+  }
   if (d.insst) { const [id, estado] = d.insst.split('|'); return run('estadoInscripcion', { id, estado }, 'Inscripción actualizada'); }
   if (d.approve) { const p = D.pastoral.personas.find(x => x.email === d.approve); return run('guardarPersona', { email: p.email, nombre: p.nombre, curso: p.curso, rol: p.rol, estado: 'activo', coordEnts: p.coordEnts, asignaciones: p.asignaciones.filter(a => a.estado === 'activa').map(a => a.entidad) }, 'Cuenta aprobada'); }
   if (d.req) { const [email, entidad, ok] = d.req.split('|'); return run('resolverSolicitud', { email, entidad, aceptar: ok === '1' }, ok === '1' ? 'Solicitud aceptada. Le llega un correo.' : 'Solicitud rechazada'); }
@@ -964,13 +1000,36 @@ root.addEventListener('click', async ev => {
   if (d.delturno) { S.delT = null; return run('borrarTurno', { id: d.delturno }, 'Turno quitado'); }
   if (d.askdelm) { S.delM = d.askdelm; return render(); }
   if (d.delmedia) { S.delM = null; $('busy').hidden = false; try { S.gal[S.cent] = await api('quitarMultimedia', { id: d.delmedia }); toast('Archivo quitado de la galería'); } catch (e) { toast(e.message); } $('busy').hidden = true; return render(); }
-  if (d.welcome) return run('darBienvenida', { entidad: S.cent, email: d.welcome }, 'Correo de bienvenida enviado');
+  if (d.welcome) { S.welcome = d.welcome; S.wMsg = ''; S.wWa = undefined; render(); setTimeout(() => { const t = $('wMsg'); if (t) t.focus(); }, 0); return; }
+  if (d.sendwelcome) {
+    const mensaje = $('wMsg').value.trim(), whatsapp = $('wWa').value.trim();
+    if (mensaje.length < 20) return toast('Escribe una breve presentación (al menos un par de frases)');
+    if (whatsapp && !/^https:\/\/chat\.whatsapp\.com\//.test(whatsapp)) return toast('El enlace de WhatsApp debe empezar por https://chat.whatsapp.com/');
+    const r = await run('darBienvenida', { entidad: S.cent, email: d.sendwelcome, mensaje, whatsapp }, 'Bienvenida enviada');
+    if (r) { S.welcome = null; S.wMsg = ''; render(); }
+    return;
+  }
   switch (d.act) {
     case 'signout': if (DEMO) return exitDemo(); return signOut(false);
     case 'demo-exit': return exitDemo();
     case 'inv-parse': { S.invText = $('invText').value; S.inv = parseInv(S.invText); return render(); }
     case 'inv-back': S.inv = null; return render();
     case 'cancel-delt': S.delT = null; return render();
+    case 'w-cancel': S.welcome = null; return render();
+    case 'w-ejemplo': {
+      const e = E(S.cent), yo = D.me.nombre.split(' ')[0];
+      S.wMsg = `Soy ${yo}, estudio ${D.me.curso || '…'} y este es mi … año en ${e.nombre}. Me alegra mucho que te sumes al equipo.\n\nAquí vas a encontrar … Lo que más me ha marcado de este voluntariado es …\n\nCualquier duda que tengas, escríbeme sin problema. ¡Nos vemos pronto!`;
+      S.wWa = $('wWa') ? $('wWa').value : S.wWa; render(); return;
+    }
+    case 'edit-info': S.editInfo = true; return render();
+    case 'cancel-info': S.editInfo = false; return render();
+    case 'save-info': {
+      const data = { entidad: S.cent, horario: $('iHor').value.trim(), lugar: $('iLug').value.trim(), descripcion: $('iDesc').value.trim(), whatsapp: $('iWa').value.trim() };
+      if (data.whatsapp && !/^https:\/\/chat\.whatsapp\.com\//.test(data.whatsapp)) return toast('El enlace de WhatsApp debe empezar por https://chat.whatsapp.com/');
+      const r = await run('guardarInfoEntidad', data, 'Información actualizada para toda la coordinación');
+      if (r) { S.editInfo = false; render(); }
+      return;
+    }
     case 'isel-pend': D.coord[S.cent].equipo.filter(p => !p.acceso && p.email !== D.me.email).forEach(p => S.isel.set.add(p.email)); return render();
     case 'isel-none': S.isel.set.clear(); return render();
     case 'send-vinv': {
@@ -1058,7 +1117,7 @@ root.addEventListener('click', async ev => {
       return;
     }
     case 'save-e': {
-      const data = { id: $('eId').value, nombre: $('eNombre').value.trim(), lugar: $('eLugar').value.trim(), etiqueta: $('eEtiqueta').value.trim(), cupo: $('eCupo').value, color: $('eColor').value, descripcion: $('eDesc').value.trim(), horario: $('eHorario').value.trim(), ig: $('eIg').value.trim(), claves: $('eClaves').value.trim(), activa: $('eActiva').checked };
+      const data = { id: $('eId').value, nombre: $('eNombre').value.trim(), lugar: $('eLugar').value.trim(), etiqueta: $('eEtiqueta').value.trim(), cupo: $('eCupo').value, color: $('eColor').value, descripcion: $('eDesc').value.trim(), horario: $('eHorario').value.trim(), ig: $('eIg').value.trim(), whatsapp: $('eWa').value.trim(), claves: $('eClaves').value.trim(), activa: $('eActiva').checked };
       if (data.ig && !/^https:\/\//.test(data.ig)) return toast('El enlace de Instagram debe empezar por https://');
       const r = await run('guardarEntidad', data, 'Entidad guardada');
       if (r) { S.editE = null; render(); }
@@ -1091,12 +1150,14 @@ root.addEventListener('change', ev => {
   if (t.id === 'fFiles' && t.files.length) { uploadMedia(t.files); t.value = ''; }
   if (t.id === 'fEnt') S.fent = t.value;
   if (t.dataset.cacepta) { S.cf.acepta = S.cf.acepta || {}; S.cf.acepta[t.dataset.cacepta] = t.checked; }
-  if (t.id === 'centSel') { S.cent = t.value; render(); }
+  if (t.id === 'centSel') { S.cent = t.value; S.editInfo = false; S.welcome = null; render(); }
   if (t.dataset.invent) { S.inv[+t.dataset.invent].ent = t.value; render(); }
   if (t.dataset.invnom) { S.inv[+t.dataset.invnom].nombre = t.value; }
 });
 root.addEventListener('input', ev => {
   if (/^c(Nombre|Dni|Tel|Curso|Act|Firma)$/.test(ev.target.id)) readCf();
+  if (ev.target.id === 'wMsg') S.wMsg = ev.target.value;
+  if (ev.target.id === 'wWa') S.wWa = ev.target.value;
   if (ev.target.id === 'q') { S.q = ev.target.value; const pos = ev.target.selectionStart; render(); const q = $('q'); q.focus(); q.setSelectionRange(pos, pos); }
 });
 window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (D && VIEWS[h] && h !== S.view) go(h); });
