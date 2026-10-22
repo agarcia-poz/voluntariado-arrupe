@@ -13,7 +13,7 @@
 // ───────────────────────── CONFIGURACIÓN ─────────────────────────
 const CONFIG = {
   // ID de cliente OAuth de Google (Google Cloud > APIs y servicios > Credenciales). Ver GUIA.md.
-  CLIENT_ID: 'PEGA_AQUI_TU_CLIENT_ID.apps.googleusercontent.com',
+  CLIENT_ID: '237021277501-7hj405nb3l88f9vhngghkg6igd0tae3m.apps.googleusercontent.com',
   // Correos del Servicio de Pastoral: acceso total y únicos que pueden abrir los documentos.
   PASTORAL: ['andresgarcia@fundacionsafa.es', 'CORREO_DE_LORENA@fundacionsafa.es'],
   // Dirección pública de la app en GitHub Pages (para los enlaces de los correos).

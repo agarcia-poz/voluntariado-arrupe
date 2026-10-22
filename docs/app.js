@@ -143,12 +143,14 @@ function pendientesPastoral() {
 
 /* ───────── vistas ───────── */
 function vLogin() {
-  const ok = CFG.CLIENT_ID && CFG.CLIENT_ID.indexOf('PEGA_AQUI') < 0 && CFG.API_URL && CFG.API_URL.indexOf('PEGA_AQUI') < 0;
+  const apiOk = /^https:\/\/script\.google\.com\/.+\/exec$/.test(String(CFG.API_URL || '').trim());
+  const cidOk = /\.apps\.googleusercontent\.com$/.test(String(CFG.CLIENT_ID || '').trim()) && CFG.CLIENT_ID.indexOf('PEGA_AQUI') < 0;
+  const ok = apiOk && cidOk;
   return `<main class="login"><div class="login-card">
     <div class="logo-wrap"><img src="${LOGO}" alt="Pastoral · Centro Universitario Sagrada Familia"></div>
     <div class="ribbon" aria-hidden="true">${COLORS.slice(0, 8).map(c => `<span style="background:${cvar(c)}"></span>`).join('')}</div>
     <div style="display:grid;gap:6px"><h1>Voluntariado Arrupe</h1><p class="muted">Libres para servir. Entra con tu cuenta de Google para ver tu voluntariado, tu documentación y tus horas.</p></div>
-    ${ok ? '<div class="gbtn-host" id="gbtn"></div>' : '<p class="err">Falta configurar la app (config.js). Consulta la guía de puesta en marcha.</p>'}
+    ${ok ? '<div class="gbtn-host" id="gbtn"></div>' : `<p class="err">${!apiOk ? 'La dirección del script en config.js no es válida: debe empezar por https://script.google.com/ y acabar en /exec.' : 'El ID de cliente de Google en config.js no es válido.'}</p>`}
     ${S.err ? `<p class="err">${esc(S.err)}</p>` : ''}
     <div class="login-note">${ic('lock', 18)}<span>La primera vez, el Servicio de Pastoral revisa tu cuenta antes de darte acceso. Tus documentos solo los ve Pastoral.</span></div>
   </div></main>`;
