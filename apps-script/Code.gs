@@ -859,7 +859,8 @@ function verify_(token) {
   const res = UrlFetchApp.fetch('https://oauth2.googleapis.com/tokeninfo?id_token=' + encodeURIComponent(token), { muteHttpExceptions: true });
   if (res.getResponseCode() !== 200) throw authErr_('Tu sesión ha caducado. Vuelve a entrar.');
   const p = JSON.parse(res.getContentText());
-  if (p.aud !== CONFIG.CLIENT_ID) throw authErr_('Token no emitido para esta app');
+  const cid = String(CONFIG.CLIENT_ID || '').trim();
+  if (p.aud !== cid) throw authErr_('El ID de cliente no coincide: la web usa ' + String(p.aud).slice(0, 18) + '… y el script tiene ' + (cid.slice(0, 18) || '(vacío)') + '…. Revisa CONFIG.CLIENT_ID en Code.gs y publica una versión nueva.');
   if (String(p.email_verified) !== 'true') throw authErr_('Tu correo de Google no está verificado');
   if (Number(p.exp) * 1000 < Date.now()) throw authErr_('Tu sesión ha caducado. Vuelve a entrar.');
   const who = { email: norm_(p.email), nombre: p.name || p.email, foto: p.picture || '' };
