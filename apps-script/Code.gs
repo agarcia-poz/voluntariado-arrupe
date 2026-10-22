@@ -35,6 +35,9 @@ const CONFIG = {
   CORREO_EQUIPO: ''
 };
 
+// Versión del script. La web la compara con la suya para avisar si hay que actualizar Code.gs.
+const VERSION_API = '2026-10-22b';
+
 const TIPOS_DOC = {
   cert: 'Certificado de delitos de naturaleza sexual',
   comp: 'Compromiso de voluntariado'
@@ -383,6 +386,12 @@ const ACCIONES = {
     if (!items.length) throw httpErr_('Selecciona al menos una inscripción');
     if (items.length > 80) throw httpErr_('Como máximo 80 inscripciones de una vez');
     const todas = rows_('Inscripciones');
+    const saltadas = [];
+    for (let k = items.length - 1; k >= 0; k--) {
+      const ins = todas.find(r => String(r.id) === items[k].id);
+      if (ins && ins.estado === 'asignada') { saltadas.push(ins.nombre); items.splice(k, 1); }
+    }
+    if (!items.length) { const out = bootstrap_(me); out.hechas = 0; out.aviso = 'Ya estaban preseleccionadas por otra persona del equipo: ' + saltadas.join(', '); return out; }
     items.forEach(x => {
       const ins = todas.find(r => String(r.id) === x.id);
       if (!ins) throw httpErr_('Hay una inscripción que ya no existe. Recarga la página.');
@@ -408,7 +417,10 @@ const ACCIONES = {
         'Ver mi equipo', 'cinicio');
     });
     log_(me, 'asignarInscripciones', items.length + ' inscripciones');
-    return bootstrap_(me);
+    const out = bootstrap_(me);
+    out.hechas = items.length;
+    if (saltadas.length) out.aviso = saltadas.length + (saltadas.length === 1 ? ' ya estaba preseleccionada' : ' ya estaban preseleccionadas') + ' por otra persona del equipo: ' + saltadas.join(', ');
+    return out;
   },
   enviarAgradecimiento: (me, d) => {
     pastoral_(me);
@@ -731,7 +743,7 @@ function bootstrap_(me) {
     me: { email: me.email, nombre: me.nombre, rol: me.rol, estado: me.estado, curso: me.curso, coordEnts: splitList_(me.coordEnts), foto: me.foto,
       telefono: String(me.telefono || ''), emailContacto: me.emailContacto || '', emergenciaNombre: me.emergenciaNombre || '', emergenciaTelefono: String(me.emergenciaTelefono || ''), avisos: String(me.avisos) !== 'no' },
     config: { horasReferencia: CONFIG.HORAS_REFERENCIA, tiposDoc: TIPOS_DOC, finCurso: CONFIG.FIN_CURSO, hoy: hoyISO_(0) },
-    entidades, noticias
+    entidades, noticias, version: VERSION_API
   };
 
   // Lo propio (cualquiera)

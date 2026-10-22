@@ -41,6 +41,7 @@ const $ = id => document.getElementById(id);
 const COLORS = ['orange', 'magenta', 'purple', 'brown', 'blue', 'red', 'grey', 'green', 'teal'];
 const cvar = c => `var(--e-${COLORS.includes(c) ? c : 'blue'})`;
 const IG = 'https://www.instagram.com/unisafa/';
+const VERSION_API = '2026-10-22b'; // debe coincidir con la de Code.gs
 
 /* ───────── estado ───────── */
 let TOKEN = null, D = null;
@@ -268,7 +269,11 @@ async function api(action, data) {
   } catch (e) { throw new Error('No hay conexión con el servidor. Revisa tu conexión e inténtalo de nuevo.'); }
   let out;
   try { out = await res.json(); } catch (e) { throw new Error('El servidor ha respondido algo inesperado. Avisa a Pastoral.'); }
-  if (!out.ok) { if (out.auth) { signOut(true, out.error); } throw new Error(out.error || 'Error desconocido'); }
+  if (!out.ok) {
+    if (out.auth) { signOut(true, out.error); }
+    if (/Acción desconocida/.test(out.error || '')) throw new Error('Esta función necesita la última versión del script de Google. Pastoral debe copiar Code.gs del repositorio y publicar una versión nueva.');
+    throw new Error(out.error || 'Error desconocido');
+  }
   return out.data;
 }
 async function run(action, data, okMsg) {
@@ -387,7 +392,7 @@ function shell(content) {
       <nav class="nav" aria-label="Secciones">${items}</nav>
       <div class="me">${avatar(me, 'var(--brand)')}<div class="who"><b>${esc(me.nombre)}</b><span>${esc(sub)}</span><br><button class="signout" data-act="signout">Cerrar sesión</button></div></div>
     </aside>
-    <main class="main"><div class="wrap">${content}</div></main>
+    <main class="main"><div class="wrap">${avisoVersion()}${content}</div></main>
   </div>`;
 }
 const header = (eyebrow, title, sub, actions = '') => `<div class="head"><div class="t"><span class="eyebrow">${eyebrow}</span><h1>${title}</h1>${sub ? `<p class="muted" style="max-width:62ch">${sub}</p>` : ''}</div>${actions ? `<div class="actions">${actions}</div>` : ''}</div>`;
@@ -577,6 +582,10 @@ function vAsistencia() {
 }
 
 /* --- pastoral --- */
+function avisoVersion() {
+  if (DEMO || !D || !caps().isP || D.version === VERSION_API) return '';
+  return `<div class="note" style="background:var(--warn-soft)">${ic('shield', 18)}<span><b>El script de Google está desactualizado.</b> Algunas funciones nuevas no responderán hasta que copies <b>apps-script/Code.gs</b> del repositorio en script.google.com y publiques una versión nueva (Implementar → Gestionar implementaciones → lápiz → Nueva versión).</span></div>`;
+}
 function vPanel() {
   const P = D.pastoral.personas, act = P.filter(p => p.estado === 'activo' && p.asignaciones.some(a => a.estado === 'activa'));
   const inc = act.filter(p => p.docs.cert.estado !== 'ok' || p.docs.comp.estado !== 'ok').length;
@@ -636,16 +645,17 @@ function insResumen(list, sel) {
 function vIns() {
   const all = D.pastoral.inscripciones;
   const F = [['nueva', 'Nuevas'], ['en_espera', 'En espera'], ['asignada', 'Asignadas'], ['descartada', 'Descartadas']];
-  const list = all.filter(i => i.estado === S.insFilter);
+  const enFiltro = all.filter(i => i.estado === S.insFilter);
+  const list = (S.insFilter === 'nueva' || S.insFilter === 'en_espera') && S.insEnt ? enFiltro.filter(i => i.preferencias.includes(S.insEnt)) : enFiltro;
   const sel = S.insSel[S.insFilter] || (S.insSel[S.insFilter] = new Set());
   [...sel].forEach(id => { if (!list.some(i => i.id === id)) sel.delete(id); });
   const preselect = S.insFilter === 'nueva' || S.insFilter === 'en_espera';
   const asignadas = S.insFilter === 'asignada';
   const n = sel.size;
   const sinAvisar = asignadas ? list.filter(i => !i.avisado) : [];
-  const bar = !list.length ? '' : preselect
-    ? `<div class="card" style="gap:10px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:grid;gap:2px;min-width:0;flex:1 1 280px"><h2>Preselección</h2><span class="muted small">Revisa el desplegable de cada inscripción y marca las que quieras preseleccionar. No se envía nada a la persona hasta que lo hagáis desde Asignadas.</span></div>
-      <div class="actions"><button class="btn ghost sm" data-act="ins-all">${n === list.length ? 'Quitar selección' : `Seleccionar todas (${list.length})`}</button>
+  const bar = !enFiltro.length ? '' : preselect
+    ? `<div class="card" style="gap:10px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:grid;gap:2px;min-width:0;flex:1 1 280px"><h2>Preselección</h2><span class="muted small">Revisa el desplegable de cada inscripción y marca las que quieras preseleccionar. Si trabajáis a la vez, repartíos por entidades con el filtro. No se envía nada a la persona hasta que lo hagáis desde Asignadas.</span></div>
+      <div class="actions"><select id="insEntF" aria-label="Mostrar inscripciones interesadas en" style="width:auto;min-height:36px;padding:5px 10px"><option value="">Todas las entidades</option>${D.entidades.filter(e => e.activa).map(e => `<option value="${esc(e.id)}" ${S.insEnt === e.id ? 'selected' : ''}>Solo interesados en ${esc(e.nombre)}</option>`).join('')}</select><button class="btn ghost sm" data-act="ins-all">${n === list.length ? 'Quitar selección' : `Seleccionar todas (${list.length})`}</button>
       <button class="btn primary" data-act="ins-pre" ${n ? '' : 'disabled'}>${ic('check', 18)}Preseleccionar${n ? ` (${n})` : ''}</button></div></div></div>`
     : asignadas ? `<div class="card" style="gap:10px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><div style="display:grid;gap:2px;min-width:0;flex:1 1 280px"><h2>Correo de agradecimiento</h2><span class="muted small">Agradece la inscripción, confirma la preselección y anuncia que la coordinación se pondrá en contacto en breve.</span></div>
       <div class="actions">${sinAvisar.length ? `<button class="btn ghost sm" data-act="ins-sinavisar">Seleccionar las no avisadas (${sinAvisar.length})</button>` : ''}${n ? '<button class="btn ghost sm" data-act="ins-none">Quitar selección</button>' : ''}
@@ -1145,7 +1155,7 @@ root.addEventListener('click', async ev => {
       if (r) { S.att.sel = new Set(); render(); }
       return;
     }
-    case 'ins-all': { const list = D.pastoral.inscripciones.filter(i => i.estado === S.insFilter), sel = S.insSel[S.insFilter]; if (sel.size === list.length) sel.clear(); else list.forEach(i => sel.add(i.id)); return render(); }
+    case 'ins-all': { const list = D.pastoral.inscripciones.filter(i => i.estado === S.insFilter && (!S.insEnt || !(S.insFilter === 'nueva' || S.insFilter === 'en_espera') || i.preferencias.includes(S.insEnt))), sel = S.insSel[S.insFilter]; if (sel.size === list.length) sel.clear(); else list.forEach(i => sel.add(i.id)); return render(); }
     case 'ins-none': S.insSel[S.insFilter].clear(); S.thanksConfirm = false; return render();
     case 'ins-sinavisar': D.pastoral.inscripciones.filter(i => i.estado === 'asignada' && !i.avisado).forEach(i => S.insSel.asignada.add(i.id)); return render();
     case 'ins-pre': {
@@ -1154,7 +1164,7 @@ root.addEventListener('click', async ev => {
       const sinEnt = items.filter(x => !x.entidades.length).length;
       if (sinEnt) return toast(sinEnt === 1 ? 'Hay una inscripción seleccionada sin entidad' : `Hay ${sinEnt} inscripciones seleccionadas sin entidad`);
       if (items.some(x => x.entidades.length > 3)) return toast('Como máximo tres entidades por persona');
-      const r = await run('asignarInscripciones', { items }, `${items.length} ${items.length === 1 ? 'persona preseleccionada' : 'personas preseleccionadas'}. Envía el correo de agradecimiento desde Asignadas cuando quieras.`);
+      const r = await run('asignarInscripciones', { items }, r => { const n = r && r.hechas !== undefined ? r.hechas : items.length; return (n ? `${n} ${n === 1 ? 'persona preseleccionada' : 'personas preseleccionadas'}. ` : '') + (r && r.aviso ? r.aviso + '.' : 'Envía el correo de agradecimiento desde Asignadas cuando quieras.'); });
       if (r) { S.insSel[S.insFilter].clear(); render(); }
       return;
     }
@@ -1209,6 +1219,7 @@ root.addEventListener('change', ev => {
     rd.readAsDataURL(f);
   }
   if (t.dataset.inssel) { const sel = S.insSel[S.insFilter]; t.checked ? sel.add(t.dataset.inssel) : sel.delete(t.dataset.inssel); S.thanksConfirm = false; render(); return; }
+  if (t.id === 'insEntF') { S.insEnt = t.value; S.insSel[S.insFilter] && S.insSel[S.insFilter].clear(); render(); return; }
   if (t.dataset.preent) { S.insEnts[t.dataset.preent] = new Set(t.value ? t.value.split(',') : []); S.insSel[S.insFilter] && S.insSel[S.insFilter].add(t.dataset.preent); render(); return; }
   if (t.dataset.insent) { const [id, ent] = t.dataset.insent.split('|'); const set = S.insEnts[id] || (S.insEnts[id] = new Set()); if (t.checked) { if (set.size >= 3) { t.checked = false; return toast('Como máximo tres entidades por persona'); } set.add(ent); S.insSel[S.insFilter] && S.insSel[S.insFilter].add(id); } else set.delete(ent); render(); return; }
   if (t.dataset.isel) { t.checked ? S.isel.set.add(t.dataset.isel) : S.isel.set.delete(t.dataset.isel); render(); return; }
@@ -1230,6 +1241,11 @@ root.addEventListener('input', ev => {
 });
 window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (D && VIEWS[h] && h !== S.view) go(h); });
 
+setInterval(async () => {
+  if (!D || DEMO || !TOKEN || document.hidden || !['ins', 'panel', 'personas', 'invitaciones'].includes(S.view) || !$('busy').hidden) return;
+  const a = document.activeElement; if (a && /^(INPUT|TEXTAREA)$/.test(a.tagName) && a.type !== 'checkbox') return;
+  try { const r = await api('bootstrap'); if (r && r.me && !DEMO) { D = r; render(); } } catch (e) { }
+}, 30000);
 if (DEMO_START) startDemo(DEMO_START);
 initGoogle();
 })();
