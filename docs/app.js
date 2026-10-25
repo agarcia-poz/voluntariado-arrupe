@@ -28,7 +28,9 @@ const I = {
   arrow: '<path d="M5 12h14M12 5l7 7-7 7"/>',
   compass: '<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/>',
   chart: '<path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/>',
+  news: '<path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8Z"/>',
   ext: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
+  life: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24M14.83 14.83l4.24 4.24M14.83 9.17l4.24-4.24M4.93 19.07l4.24-4.24"/>',
   chat: '<path d="M21 11.5a8.4 8.4 0 0 1-12.6 7.3L3 21l2.2-5.2A8.5 8.5 0 1 1 21 11.5z"/>',
   user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
   camera: '<path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/>',
@@ -41,11 +43,11 @@ const $ = id => document.getElementById(id);
 const COLORS = ['orange', 'magenta', 'purple', 'brown', 'blue', 'red', 'grey', 'green', 'teal'];
 const cvar = c => `var(--e-${COLORS.includes(c) ? c : 'blue'})`;
 const IG = 'https://www.instagram.com/unisafa/';
-const VERSION_API = '2026-10-25a'; // debe coincidir con la de Code.gs
+const VERSION_API = '2026-10-25b'; // debe coincidir con la de Code.gs
 
 /* ───────── estado ───────── */
 let TOKEN = null, D = null;
-const S = { insSel: {}, insEnts: {}, thanksConfirm: false, welcome: null, wMsg: '', wWa: undefined, editInfo: false, gal: {}, cf: {}, resign: false, tf: null, delT: null, delM: null, upMsg: '', fent: null, view: null, ent: null, leaving: null, cent: null, assigning: null, insFilter: 'nueva', q: '', editP: null, editE: null, editN: null, delN: null, delSes: null, rejecting: null, att: null, err: '' };
+const S = { inc: { tipo: 'error', asunto: '', desc: '', file: null }, incOpen: null, insSel: {}, insEnts: {}, thanksConfirm: false, welcome: null, wMsg: '', wWa: undefined, editInfo: false, gal: {}, cf: {}, resign: false, tf: null, delT: null, delM: null, upMsg: '', fent: null, view: null, ent: null, leaving: null, cent: null, assigning: null, insFilter: 'nueva', q: '', editP: null, editE: null, editN: null, delN: null, delSes: null, rejecting: null, att: null, err: '' };
 try { TOKEN = sessionStorage.getItem('arrupe-token'); } catch (e) { }
 let CODE = null;
 try {
@@ -68,7 +70,36 @@ const fmtLong = d => d ? new Date(d + 'T12:00').toLocaleDateString('es-ES', { we
 const todayISO = () => { const d = new Date(); return new Date(d.getTime() - d.getTimezoneOffset() * 60000).toISOString().slice(0, 10); };
 const sum = (a, f) => a.reduce((s, x) => s + (f ? f(x) : x), 0);
 const nf = n => (Math.round(n * 10) / 10).toLocaleString('es-ES');
-function toast(t) { const el = $('toast'); el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 3200); }
+function toast(t) { const el = $('toast'); el.hidden = true; void el.offsetWidth; el.textContent = t; el.hidden = false; clearTimeout(toast.t); toast.t = setTimeout(() => el.hidden = true, 3600); }
+const REDUCED = () => window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+// Celebración: un estallido de hilos con los colores del logo
+function celebrate(x, y) {
+  if (REDUCED() || !document.body.animate) return;
+  const box = document.createElement('div'); box.className = 'confetti'; box.setAttribute('aria-hidden', 'true');
+  const cx = x ?? innerWidth / 2, cy = y ?? innerHeight * .42;
+  for (let i = 0; i < 46; i++) {
+    const p = document.createElement('i'); p.style.left = cx + 'px'; p.style.top = cy + 'px'; p.style.background = WEAVE_COLORS[i % 8];
+    box.appendChild(p);
+    const ang = Math.random() * Math.PI * 2, v = 140 + Math.random() * 260, dx = Math.cos(ang) * v, dy = Math.sin(ang) * v - 120, rot = Math.random() * 720 - 360;
+    p.animate([{ transform: 'translate(-50%,-50%) rotate(0)', opacity: 1 }, { transform: `translate(${dx}px,${dy}px) rotate(${rot}deg)`, opacity: 1, offset: .6 }, { transform: `translate(${dx * 1.15}px,${dy + 260}px) rotate(${rot * 1.4}deg)`, opacity: 0 }], { duration: 1300 + Math.random() * 500, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'forwards' });
+  }
+  document.body.appendChild(box); setTimeout(() => box.remove(), 2000);
+}
+// Contadores que suben al entrar
+function countUp(root) {
+  if (REDUCED()) return;
+  root.querySelectorAll('.kpi b').forEach(el => {
+    const m = el.textContent.match(/^(\d+(?:[.,]\d+)?)(.*)$/); if (!m) return;
+    const end = parseFloat(m[1].replace(',', '.')), dec = /[.,]/.test(m[1]), rest = m[2]; if (!end) return;
+    const t0 = performance.now(), dur = 900;
+    const step = t => { const k = Math.min(1, (t - t0) / dur), e = 1 - Math.pow(1 - k, 3), v = end * e; el.textContent = (dec ? v.toFixed(1).replace('.', ',') : Math.round(v)) + rest; if (k < 1) requestAnimationFrame(step); };
+    el.textContent = '0' + rest; requestAnimationFrame(step);
+  });
+}
+function stagger(root) {
+  let i = 0;
+  root.querySelectorAll('.wrap > *, .wrap > .grid > *, .wrap > .kpis > *, .wrap .g3 > *').forEach(el => { el.classList.add('stg'); el.style.setProperty('--i', Math.min(i++, 14)); });
+}
 function jwtExp(t) { try { return JSON.parse(atob(t.split('.')[1].replace(/-/g, '+').replace(/_/g, '/'))).exp * 1000; } catch (e) { return 0; } }
 
 /* ───────── MODO DEMOSTRACIÓN (datos ficticios, no se guarda nada) ───────── */
@@ -144,7 +175,12 @@ function demoPastoral(base) {
         { id: 'a5', fecha: new Date(Date.now() - 50 * 3600000).toISOString(), tipo: 'baja', titulo: 'Irene Sola ha dejado Residencia de Ancianos', detalle: 'Baja desde la app', vista: 'personas', leida: true }
       ],
       sesiones: [], hojaUrl: '', carpetaUrl: '', multimediaUrl: ''
-    }
+    },
+    incidencias: [
+      { id: 'INC-261024-7F2A', fecha: new Date(Date.now() - 3 * 3600000).toISOString(), nombre: 'Javier Cuesta Ruiz', email: 'javier.cuesta@cusafa.es', rol: 'vol', tipo: 'error', asunto: 'No puedo subir el certificado desde el móvil', descripcion: 'Elijo el PDF y se queda cargando. Lo he intentado dos veces con el iPhone.', pantalla: 'Documentos', estado: 'abierta', respuesta: '', adjunto: '' },
+      { id: 'INC-261023-B91C', fecha: new Date(Date.now() - 28 * 3600000).toISOString(), nombre: 'Clara Ortega Vílchez', email: 'clara.ortega@cusafa.es', rol: 'coord', tipo: 'sugerencia', asunto: 'Exportar la asistencia a Excel', descripcion: 'Sería útil descargar las horas de todo el equipo para el certificado final.', pantalla: 'Asistencia', estado: 'abierta', respuesta: '', adjunto: '' },
+      { id: 'INC-261021-04DE', fecha: new Date(Date.now() - 80 * 3600000).toISOString(), nombre: 'Lucía Martos Ortega', email: 'lucia.martos@cusafa.es', rol: 'vol', tipo: 'duda', asunto: '¿Cómo cambio de turno?', descripcion: 'Me apunté al del lunes y prefiero el jueves.', pantalla: 'Mi horario', estado: 'resuelta', respuesta: 'Desmarca “Es mi turno” en el del lunes y márcalo en el del jueves.', adjunto: '' }
+    ]
   });
 }
 function demoData(role) {
@@ -241,6 +277,8 @@ function demoApi(action, d) {
     case 'resolverSolicitud': D2.pastoral.personas.forEach(p => { if (p.email === d.email) p.asignaciones = p.asignaciones.map(a => a.entidad === d.entidad && a.estado === 'solicitada' ? (d.aceptar ? { entidad: a.entidad, estado: 'activa' } : null) : a).filter(Boolean); }); return D2;
     case 'crearInvitaciones': d.lista.forEach(x => D2.pastoral.invitaciones.unshift({ codigo: Math.random().toString(36).slice(2, 5).toUpperCase() + '-' + Math.random().toString(36).slice(2, 5).toUpperCase(), email: x.email, nombre: x.nombre, entidades: x.entidades, estado: 'enviada', creado: todayISO(), usadoPor: '', usadoEn: '' })); return D2;
     case 'reenviarInvitacion': return D2;
+    case 'enviarIncidencia': { const x = { id: 'INC-DEMO-' + Math.random().toString(36).slice(2, 6).toUpperCase(), fecha: new Date().toISOString(), nombre: me.nombre, email: me.email, rol: me.rol, tipo: d.tipo, asunto: d.asunto, descripcion: d.descripcion, pantalla: d.pantalla, estado: 'abierta', respuesta: '', adjunto: '' }; D2.mio.incidencias = [x].concat(D2.mio.incidencias || []); if (D2.incidencias) D2.incidencias.unshift(x); const o = Object.assign({}, D2); o.ticket = x.id; return o; }
+    case 'resolverIncidencia': (D2.incidencias || []).forEach(x => { if (x.id === d.id) { x.estado = d.reabrir ? 'abierta' : 'resuelta'; if (d.respuesta) x.respuesta = d.respuesta; } }); return D2;
     case 'marcarNotificaciones': D2.pastoral.notificaciones.forEach(n => { if (d.todas || (d.ids || []).includes(n.id)) n.leida = true; }); return D2;
     case 'anularInvitacion': D2.pastoral.invitaciones.forEach(i => { if (i.codigo === d.codigo) i.estado = 'anulada'; }); return D2;
     case 'guardarEntidad': { const e = D2.entidades.find(x => x.id === d.id); if (e) Object.assign(e, d, { cupo: Number(d.cupo) || 0 }); else D2.entidades.push(Object.assign({ coordinadores: [], ocupadas: 0 }, d, { cupo: Number(d.cupo) || 0 })); return D2; }
@@ -258,7 +296,7 @@ function demoApi(action, d) {
   }
 }
 function startDemo(role) {
-  DEMO = demoData(role); D = DEMO; S.gal = {}; S.cf = {}; S.tf = null;
+  render.animate = true; DEMO = demoData(role); D = DEMO; S.gal = {}; S.cf = {}; S.tf = null;
   S.view = null; S.ent = null; S.cent = null; S.att = null; S.leaving = null;
   render.keepScroll = false; render(); window.scrollTo(0, 0);
 }
@@ -284,11 +322,13 @@ async function api(action, data) {
   }
   return out.data;
 }
+const CELEBRA = { firmarCompromiso: 1, confirmarAsistencia: 1, darBienvenida: 1, asignarInscripciones: 1, enviarAgradecimiento: 1, registrarSesion: 1, crearInvitaciones: 1, invitarVoluntarios: 1, solicitarEntidad: 1 };
 async function run(action, data, okMsg) {
   $('busy').hidden = false;
   try {
     const r = await api(action, data);
     if (r && r.me) D = r;
+    if (CELEBRA[action] && (action !== 'confirmarAsistencia' || (data && data.respuesta === 'sí'))) celebrate(run.x, run.y);
     if (okMsg) toast((typeof okMsg === 'function' ? okMsg(r) : okMsg) + (DEMO ? ' (demostración: no se guarda ni se envía nada)' : ''));
     render();
     return r;
@@ -305,6 +345,7 @@ function onCredential(resp) {
 async function load() {
   S.err = '';
   $('root').innerHTML = '<div class="boot"><div class="spinner" role="status" aria-label="Cargando"></div></div>';
+  render.animate = true;
   try { D = await api('bootstrap'); }
   catch (e) { S.err = e.message; D = null; if (TOKEN) { TOKEN = null; try { sessionStorage.removeItem('arrupe-token'); } catch (x) { } } }
   if (D && CODE) {
@@ -325,7 +366,8 @@ function signOut(silent, msg) {
   if (!silent) render(); else setTimeout(render, 0);
 }
 function initGoogle(tries = 0) {
-  if (!window.google || !google.accounts) { if (tries < 60) return setTimeout(() => initGoogle(tries + 1), 150); S.err = 'No se pudo cargar el acceso de Google. Recarga la página.'; return render(); }
+  if (tries === 1 && !DEMO && !D && !(TOKEN && jwtExp(TOKEN) > Date.now() + 60000)) render(); // muestra la pantalla de acceso sin esperar a Google
+  if (!window.google || !google.accounts) { if (tries < 60) return setTimeout(() => initGoogle(tries + 1), 150); if (DEMO) return; S.err = 'No se pudo cargar el acceso de Google. Recarga la página.'; return render(); }
   google.accounts.id.initialize({ client_id: CFG.CLIENT_ID, callback: onCredential, auto_select: true, cancel_on_tap_outside: false, use_fedcm_for_prompt: true });
   if (DEMO) return;
   if (TOKEN && jwtExp(TOKEN) > Date.now() + 60000) load(); else { TOKEN = null; render(); try { google.accounts.id.prompt(); } catch (e) { } }
@@ -341,17 +383,18 @@ function caps() {
 }
 function nav() {
   const c = caps();
-  if (c.pend) return [['espera', 'Tu cuenta', 'home'], ['datos', 'Mis datos', 'user'], ['explorar', 'Dónde servir', 'compass'], ['noticias', 'Noticias', 'bell']];
+  if (c.pend) return [['espera', 'Tu cuenta', 'home'], ['datos', 'Mis datos', 'user'], ['explorar', 'Dónde servir', 'compass'], ['noticias', 'Noticias', 'news'], ['soporte', 'Ayuda', 'life']];
   const n = [];
   if (c.isP) n.push(['panel', 'Panel', 'chart'], ['avisos', 'Avisos', 'bell'], ['ins', 'Inscripciones', 'inbox'], ['personas', 'Personas', 'users'], ['invitaciones', 'Invitaciones', 'mail'], ['entidades', 'Entidades', 'building']);
   if (c.isC) n.push(['cinicio', 'Mi entidad', 'building'], ['equipo', 'Equipo', 'users'], ['chorario', 'Horarios', 'calendar'], ['asistencia', 'Asistencia', 'check']);
   if (c.isVol) n.push(['vinicio', 'Mi voluntariado', 'home'], ['horario', 'Mi horario', 'calendar'], ['docs', 'Documentos', 'file'], ['horas', 'Mis horas', 'clock']);
   if (c.isVol || c.isC) n.push(['fotos', 'Fotos y vídeos', 'camera']);
   if (!c.isP) n.push(['datos', 'Mis datos', 'user']);
-  n.push(['explorar', 'Dónde servir', 'compass'], ['noticias', 'Noticias', 'calendar']);
+  n.push(['explorar', 'Dónde servir', 'compass'], ['noticias', 'Noticias', 'news'], ['soporte', c.isP ? 'Incidencias' : 'Ayuda', 'life']);
   return n;
 }
 function badge(k) {
+  if (k === 'soporte') return D.incidencias ? D.incidencias.filter(x => x.estado === 'abierta').length : 0;
   if (!D.pastoral) return 0;
   if (k === 'ins') return D.pastoral.inscripciones.filter(i => i.estado === 'nueva').length;
   if (k === 'panel') return pendientesPastoral().total;
@@ -373,10 +416,10 @@ function vLogin() {
   const apiOk = /^https:\/\/script\.google\.com\/.+\/exec$/.test(String(CFG.API_URL || '').trim());
   const cidOk = /\.apps\.googleusercontent\.com$/.test(String(CFG.CLIENT_ID || '').trim()) && CFG.CLIENT_ID.indexOf('PEGA_AQUI') < 0;
   const ok = apiOk && cidOk;
-  return `<main class="login"><div class="login-card">
+  return `<main class="login">${weaveSVG()}<div class="login-card">
     <div class="logo-wrap"><img src="${LOGO}" alt="Pastoral · Centro Universitario Sagrada Familia"></div>
     <div class="ribbon" aria-hidden="true">${COLORS.slice(0, 8).map(c => `<span style="background:${cvar(c)}"></span>`).join('')}</div>
-    <div style="display:grid;gap:6px"><h1>Voluntariado Arrupe</h1><p class="muted">Entra con tu cuenta de Google para ver tu voluntariado, tu documentación y tus horas.</p></div>
+    <div style="display:grid;gap:8px;justify-items:center"><h1>Voluntariado Arrupe</h1>${THREAD}<p class="muted">Entra con tu cuenta de Google para ver tu voluntariado, tu documentación y tus horas.</p></div>
     ${ok ? '<div class="gbtn-host" id="gbtn"></div>' : `<p class="err">${!apiOk ? 'La dirección del script en config.js no es válida: debe empezar por https://script.google.com/ y acabar en /exec.' : 'El ID de cliente de Google en config.js no es válido.'}</p>`}
     ${S.err ? `<p class="err">${esc(S.err)}</p>` : ''}
     ${CODE ? `<div class="note">${ic('mail', 18)}<span>Tienes una <b>invitación para coordinar</b>. Entra con tu cuenta de Google y se activará al momento.</span></div>` : ''}
@@ -392,7 +435,7 @@ function shell(content) {
   const sub = c.isP ? 'Servicio de Pastoral' : c.isC ? 'Coordinación · ' + c.coordIds.map(id => E(id).nombre).join(', ') : c.pend ? 'Cuenta pendiente' : 'Voluntario/a' + (me.curso ? ' · ' + me.curso : '');
   const items = n.map(([k, l, i]) => { const b = badge(k); return `<button data-go="${k}" ${S.view === k ? 'aria-current="page"' : ''}>${ic(i)}<span>${l}</span>${b ? `<span class="count">${b}</span>` : ''}</button>`; }).join('');
   const tabs = n.map(([k, l]) => { const b = badge(k); return `<button data-go="${k}" ${S.view === k ? 'aria-current="page"' : ''}>${l}${b ? ` (${b})` : ''}</button>`; }).join('');
-  const demoBar = DEMO ? `<div class="demo-bar" role="region" aria-label="Modo demostración"><span><b>Modo demostración</b> · datos ficticios, no se guarda nada</span>
+  const demoBar = DEMO ? `<div class="demo-bar" role="region" aria-label="Modo demostración"><span><b>Modo demostración</b><span class="demo-long"> · datos ficticios, no se guarda nada</span></span>
     <div class="seg"><button data-demo="pastoral" aria-pressed="${DEMO.me.rol === 'pastoral'}">Pastoral</button><button data-demo="coord" aria-pressed="${DEMO.me.rol === 'coord'}">Coordinación</button><button data-demo="vol" aria-pressed="${DEMO.me.rol === 'vol'}">Voluntariado</button><button data-act="demo-exit">Salir</button></div></div>` : '';
   return demoBar + `<div class="mtop"><div class="row"><div class="logo-wrap"><img src="${LOGO}" alt="Pastoral CUSAFA"></div><div style="display:flex;gap:10px;align-items:center"><button class="signout" data-act="signout">Salir</button>${avatar(me, 'var(--brand)')}</div></div><nav class="tabs" aria-label="Secciones">${tabs}</nav></div>
   <div class="shell">
@@ -404,14 +447,29 @@ function shell(content) {
     <main class="main"><div class="wrap">${avisoVersion()}${content}</div></main>
   </div>`;
 }
-const header = (eyebrow, title, sub, actions = '') => `<div class="head"><div class="t"><span class="eyebrow">${eyebrow}</span><h1>${title}</h1>${sub ? `<p class="muted" style="max-width:62ch">${sub}</p>` : ''}</div>${actions ? `<div class="actions">${actions}</div>` : ''}</div>`;
+const THREAD = '<svg class="thread" viewBox="0 0 300 16" preserveAspectRatio="none" aria-hidden="true"><path d="M2 9 C 34 2, 58 15, 92 8 S 150 2, 184 9 S 246 15, 298 6"/></svg>';
+const header = (eyebrow, title, sub, actions = '') => `<div class="head"><div class="t"><span class="eyebrow">${eyebrow}</span><h1>${title}</h1>${THREAD}${sub ? `<p class="muted">${sub}</p>` : ''}</div>${actions ? `<div class="actions">${actions}</div>` : ''}</div>`;
 const newsRow = n => `<div class="row"><div style="width:52px;text-align:center;flex:none"><b class="tnum" style="font-family:var(--display);font-size:1.15rem;display:block;line-height:1">${new Date(n.fecha + 'T12:00').getDate()}</b><span class="small muted">${new Date(n.fecha + 'T12:00').toLocaleDateString('es-ES', { month: 'short' })}</span></div><div class="grow"><b>${esc(n.titulo)}</b><span class="muted small">${esc(n.detalle)}</span></div><span class="pill info">${esc(n.tipo)}</span></div>`;
 const proximas = () => D.noticias.filter(n => n.fecha >= todayISO());
+// Tejido: hilos blancos ondulados, distintos para cada entidad
 function artSVG(seed) {
-  const r = n => ((Math.sin(seed * 999 + n) * 10000) % 1 + 1) % 1;
+  const r = n => ((Math.sin(seed * 999 + n * 7.13) * 10000) % 1 + 1) % 1;
   let s = '';
-  for (let i = 0; i < 5; i++) s += `<circle cx="${(r(i) * 100).toFixed(1)}%" cy="${(r(i + 9) * 100).toFixed(1)}%" r="${(20 + r(i + 3) * 40).toFixed(0)}" fill="rgba(255,255,255,${(.08 + r(i + 5) * .1).toFixed(2)})"/>`;
-  return `<svg aria-hidden="true">${s}<path d="M-10 90 Q 80 40 180 80 T 400 60" stroke="rgba(255,255,255,.35)" stroke-width="6" fill="none" stroke-linecap="round"/></svg>`;
+  for (let i = 0; i < 7; i++) {
+    const y = 18 + i * 22 + r(i) * 10, a = 10 + r(i + 3) * 22, ph = r(i + 7) * 120;
+    s += `<path d="M-20 ${y.toFixed(0)} C ${(60 + ph).toFixed(0)} ${(y - a).toFixed(0)}, ${(120 + ph).toFixed(0)} ${(y + a).toFixed(0)}, ${(210 + ph / 2).toFixed(0)} ${y.toFixed(0)} S ${(360).toFixed(0)} ${(y - a).toFixed(0)}, 460 ${(y + a / 2).toFixed(0)}" stroke="rgba(255,255,255,${(.12 + r(i + 11) * .28).toFixed(2)})" stroke-width="${(2 + r(i + 5) * 5).toFixed(1)}" fill="none" stroke-linecap="round"/>`;
+  }
+  for (let i = 0; i < 3; i++) s += `<circle cx="${(30 + r(i + 20) * 340).toFixed(0)}" cy="${(20 + r(i + 30) * 110).toFixed(0)}" r="${(3 + r(i + 40) * 4).toFixed(1)}" fill="rgba(255,255,255,.55)"/>`;
+  return `<svg viewBox="0 0 420 160" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${s}</svg>`;
+}
+const WEAVE_COLORS = ['#E58A00', '#D9007A', '#7B6BE0', '#C9925E', '#4FA9E0', '#E5544F', '#9AA0A6', '#3CB878'];
+function weaveSVG() {
+  let s = '';
+  WEAVE_COLORS.forEach((c, i) => {
+    const y = 90 + i * 95, a = 60 + (i % 3) * 35, d = i * 0.12;
+    s += `<path d="M-100 ${y} C 250 ${y - a}, 450 ${y + a}, 760 ${y} S 1250 ${y - a}, 1600 ${y + a / 2}" stroke="${c}" style="animation-delay:${d}s,${-i * 2}s"/>`;
+  });
+  return `<svg class="weave" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">${s}</svg>`;
 }
 
 /* --- cuenta pendiente --- */
@@ -1023,12 +1081,47 @@ async function uploadMedia(files) {
   if (ok) toast(S.upMsg + (DEMO ? ' (demostración: no se guarda nada)' : ''));
 }
 
+/* --- ayuda e incidencias --- */
+const TIPO_INC = { error: ['bad', 'Algo no funciona'], sugerencia: ['info', 'Sugerencia'], duda: ['warn', 'Duda'] };
+function incRow(x, admin) {
+  const t = TIPO_INC[x.tipo] || TIPO_INC.error, open = S.incOpen === x.id;
+  return `<div class="row" style="align-items:flex-start"><span class="pill ${x.estado === 'resuelta' ? 'ok' : 'warn'}">${x.estado === 'resuelta' ? 'Resuelta' : 'Abierta'}</span>
+    <div class="grow"><b>${esc(x.asunto)}</b><span class="muted small">${t[1]} · ${admin ? esc(x.nombre) + ' · ' : ''}${haceTxt(x.fecha)} · ${esc(x.id)}</span>
+    ${open ? `<p class="small" style="white-space:pre-wrap;margin-top:8px">${esc(x.descripcion)}</p>${x.pantalla ? `<span class="hint">Pantalla: ${esc(x.pantalla)}</span>` : ''}${x.adjunto ? `<a class="link small" href="${safeUrl(x.adjunto)}" target="_blank" rel="noopener">Ver captura</a>` : ''}
+      ${x.respuesta ? `<div class="refl" style="margin-top:8px"><span class="hint">Respuesta de Pastoral</span><p class="small" style="white-space:pre-wrap">${esc(x.respuesta)}</p></div>` : ''}
+      ${admin ? (x.estado === 'abierta' ? `<div class="field" style="margin-top:10px"><label for="incR-${esc(x.id)}">Respuesta (opcional, se le envía por correo)</label><textarea id="incR-${esc(x.id)}" placeholder="Gracias por avisar. Ya lo hemos corregido…"></textarea></div><div class="actions"><button class="btn primary sm" data-incres="${esc(x.id)}">${ic('check', 16)}Marcar como resuelta</button><a class="btn ghost sm" href="mailto:${esc(x.email)}">${ic('mail', 16)}${esc(x.email)}</a></div>` : `<button class="btn ghost sm" data-increopen="${esc(x.id)}" style="margin-top:8px">Reabrir</button>`) : ''}` : ''}</div>
+    <button class="btn ghost sm" data-incopen="${esc(x.id)}" aria-expanded="${open}">${open ? 'Cerrar' : 'Ver'}</button></div>`;
+}
+function vSoporte() {
+  const isP = caps().isP, mias = D.mio.incidencias || [], f = S.inc;
+  const form = `<div class="card"><h2>Cuéntanos qué ha pasado</h2>
+    <div class="filters" role="group" aria-label="Tipo de incidencia">${Object.entries(TIPO_INC).map(([k, v]) => `<button data-inctipo="${k}" aria-pressed="${f.tipo === k}">${v[1]}</button>`).join('')}</div>
+    <div class="form-grid">
+      <div class="field wide"><label for="incAs">Asunto</label><input type="text" id="incAs" maxlength="140" value="${esc(f.asunto)}" placeholder="${f.tipo === 'sugerencia' ? 'Ej.: Poder ver el horario en el móvil sin entrar' : f.tipo === 'duda' ? 'Ej.: ¿Cómo cambio de turno?' : 'Ej.: No puedo subir el certificado'}"></div>
+      <div class="field wide"><label for="incDe">Descripción</label><textarea id="incDe" maxlength="4000" style="min-height:130px" placeholder="${f.tipo === 'error' ? 'Qué estabas haciendo, qué esperabas que pasara y qué ha pasado. Si salió algún mensaje, cópialo.' : 'Cuéntanoslo con el detalle que quieras.'}">${esc(f.desc)}</textarea></div>
+      <div class="field wide"><span style="font-weight:600;font-size:.88rem">Captura de pantalla (opcional)</span>
+        <label class="file btn ghost sm" for="incFile" style="justify-self:start">${ic('upload', 16)}${f.file ? esc(f.file.name) : 'Adjuntar imagen'}<input type="file" id="incFile" accept="image/png,image/jpeg,image/webp,image/heic"></label></div>
+    </div>
+    <p class="hint">Se envía al equipo de Pastoral junto con la pantalla en la que estás y tu navegador, para poder reproducirlo.</p>
+    <button class="btn primary" data-act="inc-send" style="justify-self:start">${ic('mail', 18)}Enviar a la administración</button></div>`;
+  if (isP) {
+    const all = D.incidencias || [], abiertas = all.filter(x => x.estado === 'abierta'), res = all.filter(x => x.estado !== 'abierta');
+    return header('Servicio de Pastoral', 'Incidencias', 'Lo que coordinación y voluntariado os envían desde la app. También os llega por correo; al responder aquí, la persona recibe vuestra respuesta.') +
+      `<div class="card"><h2>Abiertas${abiertas.length ? ' · ' + abiertas.length : ''}</h2>${abiertas.length ? `<div class="list">${abiertas.map(x => incRow(x, true)).join('')}</div>` : '<div class="empty">No hay incidencias abiertas.</div>'}</div>
+      ${res.length ? `<details class="card"><summary style="cursor:pointer;font-weight:600">Resueltas (${res.length})</summary><div class="list">${res.map(x => incRow(x, true)).join('')}</div></details>` : ''}`;
+  }
+  return header('Ayuda', 'Ayuda e incidencias', 'Si algo no funciona, tienes una duda o se te ocurre una mejora, escríbenos. Llega directamente al equipo de Pastoral.') +
+    `<div class="grid g2" style="align-items:start">${form}
+    <div class="card"><h2>Lo que has enviado</h2>${mias.length ? `<div class="list">${mias.map(x => incRow(x, false)).join('')}</div>` : '<p class="muted small">Todavía no has enviado ninguna incidencia.</p>'}
+      <div class="note small">${ic('heart', 18)}<span>Gracias por ayudarnos a mejorar la app. Cada aviso nos sirve.</span></div></div></div>`;
+}
+
 /* ───────── render ───────── */
-const VIEWS = { avisos: vAvisos, horario: vHorario, chorario: vChorario, compromiso: vCompromiso, datos: vDatos, fotos: vFotos, espera: vEspera, explorar: vExplorar, vinicio: vVinicio, docs: vDocs, horas: vHoras, cinicio: vCinicio, equipo: vEquipo, asistencia: vAsistencia, panel: vPanel, ins: vIns, personas: vPersonas, invitaciones: vInvitaciones, entidades: vEntidades, noticias: vNoticias };
+const VIEWS = { soporte: vSoporte, avisos: vAvisos, horario: vHorario, chorario: vChorario, compromiso: vCompromiso, datos: vDatos, fotos: vFotos, espera: vEspera, explorar: vExplorar, vinicio: vVinicio, docs: vDocs, horas: vHoras, cinicio: vCinicio, equipo: vEquipo, asistencia: vAsistencia, panel: vPanel, ins: vIns, personas: vPersonas, invitaciones: vInvitaciones, entidades: vEntidades, noticias: vNoticias };
 function render() {
   const root = $('root');
   if (!D) {
-    root.innerHTML = vLogin();
+    root.innerHTML = vLogin(); root.classList.add('enter'); render.animate = true;
     const host = $('gbtn');
     if (host && window.google && google.accounts) {
       try { google.accounts.id.renderButton(host, { theme: matchMedia('(prefers-color-scheme: dark)').matches ? 'filled_black' : 'outline', size: 'large', shape: 'pill', text: 'continue_with', locale: 'es', width: 300 }); } catch (e) { }
@@ -1041,24 +1134,29 @@ function render() {
     const h = (location.hash || '').slice(1);
     S.view = n.some(x => x[0] === h) ? h : n[0][0];
   }
-  const y = window.scrollY;
+  const y = window.scrollY, anim = render.animate !== false;
   root.innerHTML = shell(VIEWS[S.view]());
+  root.classList.toggle('enter', anim);
+  if (anim) { stagger(root); countUp(root); }
+  render.animate = false;
   window.scrollTo(0, render.keepScroll ? y : 0);
   render.keepScroll = true;
 }
 function readTf() { const g = id => ($(id) || {}).value; const o = {}; if ($('tfDia')) o.dia = g('tfDia'); if ($('tfFecha')) o.fecha = g('tfFecha'); ['inicio:tfIni', 'fin:tfFin', 'lugar:tfLugar', 'nota:tfNota'].forEach(s => { const [k, id] = s.split(':'); if ($(id)) o[k] = $(id).value; }); return o; }
 function readCf() { const g = id => $(id) ? $(id).value.trim() : undefined; const m = { nombre: 'cNombre', dni: 'cDni', telefono: 'cTel', curso: 'cCurso', actividades: 'cAct', firma: 'cFirma' }; Object.keys(m).forEach(k => { const v = g(m[k]); if (v !== undefined) S.cf[k] = k === 'dni' ? v.toUpperCase() : v; }); }
-function go(v) { S.view = v; S.ent = null; S.leaving = null; render.keepScroll = false; try { history.replaceState(null, '', '#' + v); } catch (e) { } render(); }
+const NAV_LABEL = {};
+function go(v) { render.animate = true; if (S.view !== 'soporte') S.prevView = S.view; S.view = v; S.ent = null; S.leaving = null; render.keepScroll = false; try { history.replaceState(null, '', '#' + v); } catch (e) { } render(); }
 
 /* ───────── eventos ───────── */
 const root = $('root');
+root.addEventListener('pointerdown', ev => { run.x = ev.clientX; run.y = ev.clientY; }, true);
 root.addEventListener('click', async ev => {
   const t = ev.target.closest('button,[data-ent],tr[data-editp]'); if (!t || t.disabled) return;
   const d = t.dataset;
   if (d.demo) return startDemo(d.demo);
   if (d.go) return go(d.go);
-  if (d.ent) { S.view = 'explorar'; S.ent = d.ent; S.leaving = null; render.keepScroll = false; return render(); }
-  if (d.insf) { S.insFilter = d.insf; S.thanksConfirm = false; return render(); }
+  if (d.ent) { render.animate = true; S.view = 'explorar'; S.ent = d.ent; S.leaving = null; render.keepScroll = false; return render(); }
+  if (d.insf) { render.animate = true; S.insFilter = d.insf; S.thanksConfirm = false; return render(); }
   if (d.insst) { const [id, estado] = d.insst.split('|'); return run('estadoInscripcion', { id, estado }, 'Inscripción actualizada'); }
   if (d.approve) { const p = D.pastoral.personas.find(x => x.email === d.approve); return run('guardarPersona', { email: p.email, nombre: p.nombre, curso: p.curso, rol: p.rol, estado: 'activo', coordEnts: p.coordEnts, asignaciones: p.asignaciones.filter(a => a.estado === 'activa').map(a => a.entidad) }, 'Cuenta aprobada'); }
   if (d.req) { const [email, entidad, ok] = d.req.split('|'); return run('resolverSolicitud', { email, entidad, aceptar: ok === '1' }, ok === '1' ? 'Solicitud aceptada. Le llega un correo.' : 'Solicitud rechazada'); }
@@ -1081,6 +1179,10 @@ root.addEventListener('click', async ev => {
     if (n && !n.leida) { n.leida = true; api('marcarNotificaciones', { ids: [id] }).then(r => { if (r && r.me && !DEMO) D = r; }).catch(() => { }); }
     return go(VIEWS[vista] ? vista : 'panel');
   }
+  if (d.inctipo) { S.inc.tipo = d.inctipo; return render(); }
+  if (d.incopen) { S.incOpen = S.incOpen === d.incopen ? null : d.incopen; return render(); }
+  if (d.incres) { const r = ($('incR-' + d.incres) || {}).value || ''; return run('resolverIncidencia', { id: d.incres, respuesta: r.trim() }, r.trim() ? 'Resuelta. Le hemos enviado tu respuesta.' : 'Marcada como resuelta'); }
+  if (d.increopen) return run('resolverIncidencia', { id: d.increopen, reabrir: true }, 'Incidencia reabierta');
   if (d.conf) { const [turno, fecha, respuesta] = d.conf.split('|'); return run('confirmarAsistencia', { turno, fecha, respuesta }, respuesta === 'sí' ? '¡Gracias! Asistencia confirmada' : 'Hemos avisado a tu coordinación'); }
   if (d.tftipo) { S.tf = Object.assign(S.tf || {}, readTf(), { tipo: d.tftipo }); return render(); }
   if (d.askdelt) { S.delT = d.askdelt; return render(); }
@@ -1102,6 +1204,19 @@ root.addEventListener('click', async ev => {
     case 'inv-parse': { S.invText = $('invText').value; S.inv = parseInv(S.invText); return render(); }
     case 'inv-back': S.inv = null; return render();
     case 'cancel-delt': S.delT = null; return render();
+    case 'inc-send': {
+      const f = S.inc; f.asunto = $('incAs').value.trim(); f.desc = $('incDe').value.trim();
+      if (f.asunto.length < 4) return toast('Escribe un asunto breve');
+      if (f.desc.length < 10) return toast('Cuéntanos un poco más qué ha pasado');
+      const data = { tipo: f.tipo, asunto: f.asunto, descripcion: f.desc, pantalla: (NAV_LABEL[S.prevView] || S.prevView || ''), navegador: navigator.userAgent + ' · ' + innerWidth + '×' + innerHeight };
+      if (f.file) {
+        if (f.file.size > 6 * 1024 * 1024) return toast('La captura supera los 6 MB');
+        data.mime = f.file.type; data.base64 = await new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(String(rd.result).split(',')[1]); rd.onerror = rej; rd.readAsDataURL(f.file); });
+      }
+      const r = await run('enviarIncidencia', data, r => 'Enviada' + (r && r.ticket ? ' (' + r.ticket + ')' : '') + '. ¡Gracias por avisarnos!');
+      if (r) { S.inc = { tipo: 'error', asunto: '', desc: '', file: null }; render(); celebrate(); }
+      return;
+    }
     case 'avisos-leidos': return run('marcarNotificaciones', { todas: true }, 'Todos los avisos marcados como leídos');
     case 'w-cancel': S.welcome = null; return render();
     case 'w-ejemplo': {
@@ -1165,7 +1280,7 @@ root.addEventListener('click', async ev => {
       if (r) { clearCode(); S.view = null; render(); } else { S.codeErr = 'No se pudo activar. Revisa el código.'; render(); }
       return;
     }
-    case 'back': S.ent = null; return render();
+    case 'back': S.ent = null; render.animate = true; return render();
     case 'join': return run('solicitarEntidad', { entidad: S.ent }, 'Solicitud enviada. Pastoral te responderá pronto.');
     case 'leave': S.leaving = S.ent; return render();
     case 'leave-no': S.leaving = null; return render();
@@ -1252,6 +1367,7 @@ root.addEventListener('change', ev => {
     rd.readAsDataURL(f);
   }
   if (t.dataset.inssel) { const sel = S.insSel[S.insFilter]; t.checked ? sel.add(t.dataset.inssel) : sel.delete(t.dataset.inssel); S.thanksConfirm = false; render(); return; }
+  if (t.id === 'incFile') { S.inc.file = t.files[0] || null; S.inc.asunto = $('incAs').value; S.inc.desc = $('incDe').value; render(); return; }
   if (t.id === 'insEntF') { S.insEnt = t.value; S.insSel[S.insFilter] && S.insSel[S.insFilter].clear(); render(); return; }
   if (t.dataset.preent) { S.insEnts[t.dataset.preent] = new Set(t.value ? t.value.split(',') : []); S.insSel[S.insFilter] && S.insSel[S.insFilter].add(t.dataset.preent); render(); return; }
   if (t.dataset.insent) { const [id, ent] = t.dataset.insent.split('|'); const set = S.insEnts[id] || (S.insEnts[id] = new Set()); if (t.checked) { if (set.size >= 3) { t.checked = false; return toast('Como máximo tres entidades por persona'); } set.add(ent); } else set.delete(ent); const sl = S.insSel[S.insFilter]; if (sl) { if (set.size) sl.add(id); else sl.delete(id); } render(); return; }
@@ -1269,9 +1385,17 @@ root.addEventListener('change', ev => {
 root.addEventListener('input', ev => {
   if (/^c(Nombre|Dni|Tel|Curso|Act|Firma)$/.test(ev.target.id)) readCf();
   if (ev.target.id === 'wMsg') S.wMsg = ev.target.value;
+  if (ev.target.id === 'incAs') S.inc.asunto = ev.target.value;
+  if (ev.target.id === 'incDe') S.inc.desc = ev.target.value;
   if (ev.target.id === 'wWa') S.wWa = ev.target.value;
   if (ev.target.id === 'q') { S.q = ev.target.value; const pos = ev.target.selectionStart; render(); const q = $('q'); q.focus(); q.setSelectionRange(pos, pos); }
 });
+root.addEventListener('pointermove', ev => {
+  const c = ev.target.closest && ev.target.closest('.ent'); if (!c || REDUCED() || ev.pointerType !== 'mouse') return;
+  const b = c.getBoundingClientRect(), px = (ev.clientX - b.left) / b.width - .5, py = (ev.clientY - b.top) / b.height - .5;
+  c.style.setProperty('--ry', (px * 7).toFixed(2) + 'deg'); c.style.setProperty('--rx', (-py * 7).toFixed(2) + 'deg');
+});
+root.addEventListener('pointerout', ev => { const c = ev.target.closest && ev.target.closest('.ent'); if (c && !c.contains(ev.relatedTarget)) { c.style.removeProperty('--rx'); c.style.removeProperty('--ry'); } });
 window.addEventListener('hashchange', () => { const h = location.hash.slice(1); if (D && VIEWS[h] && h !== S.view) go(h); });
 
 setInterval(async () => {
@@ -1279,6 +1403,7 @@ setInterval(async () => {
   const a = document.activeElement; if (a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)) return;
   try { const r = await api('bootstrap'); if (r && r.me && !DEMO) { D = r; render(); } } catch (e) { }
 }, 30000);
+(() => { const d = document.createElement('div'); d.innerHTML = '<svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs><linearGradient id="hilo" x1="0" x2="1" y1="0" y2="0"><stop offset="0" stop-color="#E58A00"/><stop offset=".15" stop-color="#D9007A"/><stop offset=".3" stop-color="#5B49B8"/><stop offset=".45" stop-color="#8E5A32"/><stop offset=".6" stop-color="#12679A"/><stop offset=".75" stop-color="#D9312B"/><stop offset=".88" stop-color="#55595D"/><stop offset="1" stop-color="#25995A"/></linearGradient></defs></svg>'; document.body.prepend(d.firstChild); })();
 if (DEMO_START) startDemo(DEMO_START);
 initGoogle();
 })();

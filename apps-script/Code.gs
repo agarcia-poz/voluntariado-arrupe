@@ -38,7 +38,7 @@ const CONFIG = {
 };
 
 // Versión del script. La web la compara con la suya para avisar si hay que actualizar Code.gs.
-const VERSION_API = '2026-10-25a';
+const VERSION_API = '2026-10-25b';
 
 const TIPOS_DOC = {
   cert: 'Certificado de delitos de naturaleza sexual',
@@ -61,6 +61,7 @@ const HOJAS = {
   Confirmaciones: ['turno', 'fecha', 'email', 'respuesta', 'cuando'],
   Recordatorios: ['turno', 'fecha', 'email', 'enviado'],
   Multimedia: ['fileId', 'entidad', 'email', 'nombre', 'mime', 'fecha', 'descripcion', 'estado'],
+  Incidencias: ['id', 'fecha', 'email', 'nombre', 'rol', 'tipo', 'asunto', 'descripcion', 'pantalla', 'navegador', 'adjunto', 'estado', 'respuesta', 'resueltoPor', 'resuelto'],
   Notificaciones: ['id', 'fecha', 'tipo', 'titulo', 'detalle', 'vista', 'leidaPor', 'resumidaPara'],
   Invitaciones: ['codigo', 'email', 'nombre', 'rol', 'entidades', 'estado', 'creado', 'creadoPor', 'usadoPor', 'usadoEn']
 };
@@ -708,6 +709,55 @@ const ACCIONES = {
     return ACCIONES.galeria(me, { entidad: m.entidad });
   },
 
+  // ── incidencias / soporte ──
+  enviarIncidencia: (me, d) => {
+    const tipos = { error: 'Algo no funciona', sugerencia: 'Sugerencia de mejora', duda: 'Duda sobre la app' };
+    const tipo = tipos[d.tipo] ? d.tipo : 'error';
+    const asunto = String(d.asunto || '').trim().slice(0, 140), desc = String(d.descripcion || '').trim().slice(0, 4000);
+    if (asunto.length < 4) throw httpErr_('Escribe un asunto breve');
+    if (desc.length < 10) throw httpErr_('Cuéntanos un poco más qué ha pasado');
+    const recientes = rows_('Incidencias').filter(r => r.email === me.email && daysAgo_(r.fecha) < 1 / 24).length;
+    if (recientes >= 5) throw httpErr_('Has enviado varias incidencias en la última hora. Espera un poco, por favor.');
+    let adjunto = '';
+    if (d.base64) {
+      if (!/^image\/(png|jpeg|webp|heic|heif)$/.test(d.mime || '')) throw httpErr_('La captura debe ser una imagen');
+      const bytes = Utilities.base64Decode(d.base64);
+      if (bytes.length > 6 * 1024 * 1024) throw httpErr_('La captura supera los 6 MB');
+      const f = carpetaIncidencias_().createFile(Utilities.newBlob(bytes, d.mime, Utilities.formatDate(new Date(), 'Europe/Madrid', 'yyyyMMdd-HHmm') + '_' + me.email.split('@')[0] + '.' + String(d.mime).split('/')[1]));
+      f.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+      adjunto = f.getId();
+    }
+    const id = 'INC-' + Utilities.formatDate(new Date(), 'Europe/Madrid', 'yyMMdd') + '-' + Utilities.getUuid().slice(0, 4).toUpperCase();
+    const inc = { id, fecha: new Date(), email: me.email, nombre: me.nombre, rol: me.rol, tipo, asunto, descripcion: desc, pantalla: String(d.pantalla || '').slice(0, 60), navegador: String(d.navegador || '').slice(0, 300), adjunto, estado: 'abierta', respuesta: '', resueltoPor: '', resuelto: '' };
+    withLock_(() => append_('Incidencias', inc));
+    const rolTxt = { pastoral: 'Pastoral', coord: 'Coordinación', vol: 'Voluntariado' }[me.rol] || me.rol;
+    mail_(equipoPastoral_(), '[' + id + '] ' + tipos[tipo] + ': ' + asunto,
+      `<p><b>${esc_(me.nombre)}</b> (${esc_(me.email)} · ${esc_(rolTxt)}) ha enviado una incidencia desde la app.</p>
+       <div style="border:1px solid #D9E3EC;border-radius:12px;padding:14px 16px">
+       <p style="margin:0 0 6px"><b>${esc_(tipos[tipo])}</b> · ${esc_(id)}</p>
+       <p style="margin:0 0 10px;font-size:17px"><b>${esc_(asunto)}</b></p>
+       ${esc_(desc).split(/\n{2,}/).map(x => '<p style="margin:0 0 8px">' + x.replace(/\n/g, '<br>') + '</p>').join('')}
+       <p style="margin:10px 0 0;color:#6E8193;font-size:13px">Pantalla: ${esc_(inc.pantalla || '—')}<br>Navegador: ${esc_(inc.navegador || '—')}${adjunto ? '<br>Captura: <a href="https://drive.google.com/file/d/' + adjunto + '/view">abrir en Drive</a>' : ''}</p></div>
+       <p>Responde a este correo para escribir directamente a ${esc_(me.nombre.split(' ')[0])}, o márcala como resuelta en la app.</p>`,
+      'Ver incidencias', 'soporte', me.email);
+    notificar_('incidencia', 'Incidencia de ' + me.nombre + ': ' + asunto, tipos[tipo], 'soporte');
+    log_(me, 'enviarIncidencia', id);
+    const out = bootstrap_(me); out.ticket = id; return out;
+  },
+  resolverIncidencia: (me, d) => {
+    pastoral_(me);
+    const inc = rows_('Incidencias').find(r => String(r.id) === String(d.id));
+    if (!inc) throw httpErr_('Incidencia no encontrada');
+    const respuesta = String(d.respuesta || '').trim().slice(0, 2000);
+    const estado = d.reabrir ? 'abierta' : 'resuelta';
+    withLock_(() => updateWhere_('Incidencias', r => String(r.id) === String(d.id), { estado, respuesta: respuesta || inc.respuesta, resueltoPor: d.reabrir ? '' : me.email, resuelto: d.reabrir ? '' : new Date() }));
+    if (!d.reabrir && respuesta) mail_([inc.email], 'Hemos revisado tu incidencia · ' + inc.asunto,
+      `<p>Hola, ${esc_(String(inc.nombre || '').split(' ')[0])}:</p><p>Gracias por avisarnos. Hemos revisado tu incidencia <b>${esc_(inc.asunto)}</b> (${esc_(inc.id)}).</p>
+       <div style="border-left:3px solid #12679A;padding:4px 0 4px 12px">${esc_(respuesta).split(/\n{2,}/).map(x => '<p style="margin:0 0 8px">' + x.replace(/\n/g, '<br>') + '</p>').join('')}</div>
+       <p style="margin-bottom:0">Un abrazo,<br>El equipo de Pastoral</p>`, 'Abrir la app', 'soporte', CONFIG.CORREO_EQUIPO);
+    log_(me, 'resolverIncidencia', d.id + ' · ' + estado);
+    return bootstrap_(me);
+  },
   marcarNotificaciones: (me, d) => {
     pastoral_(me);
     const ids = d.todas ? null : new Set((d.ids || []).map(String));
@@ -787,6 +837,10 @@ function bootstrap_(me) {
     });
   });
   out.mio.proximos.sort((a, b) => (a.fecha + a.inicio) < (b.fecha + b.inicio) ? -1 : 1);
+  const incs = rows_('Incidencias');
+  const incOut = r => ({ id: String(r.id), fecha: r.fecha instanceof Date ? r.fecha.toISOString() : String(r.fecha), nombre: r.nombre, email: r.email, rol: r.rol, tipo: r.tipo, asunto: r.asunto, descripcion: r.descripcion, pantalla: r.pantalla, estado: r.estado, respuesta: r.respuesta, adjunto: me.rol === 'pastoral' && r.adjunto ? 'https://drive.google.com/file/d/' + r.adjunto + '/view' : '', resuelto: iso_(r.resuelto) });
+  out.mio.incidencias = incs.filter(r => r.email === me.email).reverse().slice(0, 20).map(incOut);
+  if (me.rol === 'pastoral') out.incidencias = incs.slice(-80).reverse().map(incOut);
   out.mio.misSubidas = rows_('Multimedia').filter(m => m.email === me.email && m.estado === 'activa').length;
   if (me.rol === 'pastoral') asegurarRecordatorios_();
 
@@ -1164,6 +1218,17 @@ function mailAgradecimiento_(ins, me) {
      <p>Mientras tanto, puedes entrar en la app con esta cuenta de Google para ir completando tu documentación: el certificado de delitos de naturaleza sexual y el compromiso de voluntariado.</p>
      <p style="margin-bottom:0">Un abrazo,<br>El equipo de Pastoral<br><span style="color:#6E8193;font-size:13px">Centro Universitario Sagrada Familia</span></p>`,
     'Entrar en la app', 'docs', CONFIG.CORREO_EQUIPO);
+}
+
+function carpetaIncidencias_() {
+  const p = PropertiesService.getScriptProperties(), id = p.getProperty('INC_ID');
+  if (id) { try { return DriveApp.getFolderById(id); } catch (e) { } }
+  const f = DriveApp.createFolder('Voluntariado Arrupe · Incidencias (capturas)');
+  f.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+  const owner = norm_(Session.getEffectiveUser().getEmail());
+  equipoPastoral_().filter(e => e !== owner).forEach(e => { try { f.addEditor(e); } catch (x) { } });
+  p.setProperty('INC_ID', f.getId());
+  return f;
 }
 
 // ───────────────────────── NOTIFICACIONES PARA PASTORAL ─────────────────────────
