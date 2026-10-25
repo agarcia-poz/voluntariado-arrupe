@@ -429,7 +429,6 @@ function vLogin() {
     ${ok ? '<div class="gbtn-host" id="gbtn"></div>' : `<p class="err">${!apiOk ? 'La dirección del script en config.js no es válida: debe empezar por https://script.google.com/ y acabar en /exec.' : 'El ID de cliente de Google en config.js no es válido.'}</p>`}
     ${S.err ? `<p class="err">${esc(S.err)}</p>` : ''}
     ${CODE ? `<div class="note">${ic('mail', 18)}<span>Tienes una <b>invitación para coordinar</b>. Entra con tu cuenta de Google y se activará al momento.</span></div>` : ''}
-    <button class="signout" data-demo="vol" style="justify-self:center">Ver una demostración de la app</button>
     <div class="login-note">${ic('lock', 18)}<span>La primera vez, el Servicio de Pastoral revisa tu cuenta antes de darte acceso. Tus documentos solo los ve Pastoral.</span></div>
   </div></main>`;
 }
