@@ -33,13 +33,12 @@ const CONFIG = {
   // llegan ahí, en vez de a la cuenta personal que ejecuta el script. Debe estar configurada en Gmail como
   // dirección "Enviar como" de esta cuenta (Gmail → Configuración → Cuentas → Enviar como). Si no, déjalo vacío.
   CORREO_EQUIPO: '',
-  // Los avisos para Pastoral se ven como notificaciones en la app. Llega un correo de resumen cuando
-  // se acumulan estas notificaciones sin leer, y cada mañana si alguna lleva más de un día sin leer.
-  AVISO_ACUMULADAS: 5
+  // Los avisos para Pastoral solo se ven en la app (sección Avisos); no se envía ningún correo de resumen.
+  AVISO_ACUMULADAS: 0
 };
 
 // Versión del script. La web la compara con la suya para avisar si hay que actualizar Code.gs.
-const VERSION_API = '2026-10-22c';
+const VERSION_API = '2026-10-25a';
 
 const TIPOS_DOC = {
   cert: 'Certificado de delitos de naturaleza sexual',
@@ -992,7 +991,6 @@ function pagina_(titulo, texto) {
 /** Se ejecuta cada día (lo instala la app sola). Envía el recordatorio de los encuentros de mañana. */
 function enviarRecordatorios() {
   resetCache_();
-  try { resumenNotificaciones_(true); } catch (e) { Logger.log(e); }
   const man = hoyISO_(1);
   const ya = new Set(rows_('Recordatorios').map(r => String(r.turno) + '|' + iso_(r.fecha) + '|' + r.email));
   const apuntados = rows_('Apuntados');
@@ -1173,12 +1171,12 @@ function equipoPastoral_() { return CONFIG.PASTORAL.map(norm_).filter(e => e.ind
 function notificar_(tipo, titulo, detalle, vista) {
   try {
     withLock_(() => append_('Notificaciones', { id: Utilities.getUuid().slice(0, 10), fecha: new Date(), tipo, titulo: String(titulo).slice(0, 200), detalle: String(detalle || '').slice(0, 300), vista: vista || 'panel', leidaPor: '', resumidaPara: '' }));
-    resumenNotificaciones_(false);
   } catch (e) { Logger.log('No se pudo guardar la notificación: ' + e); }
 }
 // Envía a cada persona de Pastoral un correo con lo que tiene sin leer y aún no se le ha resumido,
 // si se han acumulado CONFIG.AVISO_ACUMULADAS o, en el repaso diario, si hay alguna de hace más de un día.
 function resumenNotificaciones_(diario) {
+  if (!CONFIG.AVISO_ACUMULADAS) return; // desactivado: los avisos se revisan en la app
   const rows = rows_('Notificaciones');
   equipoPastoral_().forEach(email => {
     const pend = rows.filter(n => splitList_(n.leidaPor).indexOf(email) < 0 && splitList_(n.resumidaPara).indexOf(email) < 0);

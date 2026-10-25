@@ -41,7 +41,7 @@ const $ = id => document.getElementById(id);
 const COLORS = ['orange', 'magenta', 'purple', 'brown', 'blue', 'red', 'grey', 'green', 'teal'];
 const cvar = c => `var(--e-${COLORS.includes(c) ? c : 'blue'})`;
 const IG = 'https://www.instagram.com/unisafa/';
-const VERSION_API = '2026-10-22c'; // debe coincidir con la de Code.gs
+const VERSION_API = '2026-10-25a'; // debe coincidir con la de Code.gs
 
 /* ───────── estado ───────── */
 let TOKEN = null, D = null;
@@ -608,7 +608,7 @@ function avisoRow(n) {
 }
 function vAvisos() {
   const L = D.pastoral.notificaciones || [], sin = L.filter(n => !n.leida), leidas = L.filter(n => n.leida);
-  return header('Servicio de Pastoral', 'Avisos', `Lo que pasa en el voluntariado, sin llenar vuestro correo. Si se acumulan ${sin.length ? '' : 'varios '}avisos sin leer, os llegará un correo de resumen.`, sin.length ? `<button class="btn ghost" data-act="avisos-leidos">${ic('check', 18)}Marcar todos como leídos</button>` : '') +
+  return header('Servicio de Pastoral', 'Avisos', 'Lo que pasa en el voluntariado, sin llenar vuestro correo. Revisadlos aquí: no se envía ningún correo de aviso.', sin.length ? `<button class="btn ghost" data-act="avisos-leidos">${ic('check', 18)}Marcar todos como leídos</button>` : '') +
     `<div class="card"><h2>Sin leer${sin.length ? ` · ${sin.length}` : ''}</h2>${sin.length ? `<div class="list">${sin.map(avisoRow).join('')}</div>` : '<div class="empty">Estáis al día.</div>'}</div>
     ${leidas.length ? `<details class="card"><summary style="cursor:pointer;font-weight:600">Leídos recientemente (${leidas.length})</summary><div class="list">${leidas.map(avisoRow).join('')}</div></details>` : ''}`;
 }
