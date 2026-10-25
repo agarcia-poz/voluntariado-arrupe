@@ -28,6 +28,7 @@ const I = {
   arrow: '<path d="M5 12h14M12 5l7 7-7 7"/>',
   compass: '<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/>',
   chart: '<path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/>',
+  feather: '<path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><path d="M16 8 2 22M17.5 15H9"/>',
   news: '<path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8Z"/>',
   ext: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
   life: '<circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="4"/><path d="m4.93 4.93 4.24 4.24M14.83 14.83l4.24 4.24M14.83 9.17l4.24-4.24M4.93 19.07l4.24-4.24"/>',
@@ -43,7 +44,7 @@ const $ = id => document.getElementById(id);
 const COLORS = ['orange', 'magenta', 'purple', 'brown', 'blue', 'red', 'grey', 'green', 'teal'];
 const cvar = c => `var(--e-${COLORS.includes(c) ? c : 'blue'})`;
 const IG = 'https://www.instagram.com/unisafa/';
-const VERSION_API = '2026-10-25b'; // debe coincidir con la de Code.gs
+const VERSION_API = '2026-10-25c'; // debe coincidir con la de Code.gs
 
 /* ───────── estado ───────── */
 let TOKEN = null, D = null;
@@ -55,6 +56,8 @@ try {
   if (c) { sessionStorage.setItem('arrupe-code', c); u.searchParams.delete('codigo'); history.replaceState(null, '', u.pathname + u.search + u.hash); }
   CODE = sessionStorage.getItem('arrupe-code');
 } catch (e) { }
+let REFL_START = null;
+try { const u = new URL(location.href), r = u.searchParams.get('reflexion'); if (r) { REFL_START = r; u.searchParams.delete('reflexion'); history.replaceState(null, '', u.pathname + u.search + '#reflexion'); } } catch (e) { }
 let DEMO_START = null;
 try { const q = new URL(location.href).searchParams.get('demo'); if (q === 'coord' || q === 'vol' || q === 'pastoral') DEMO_START = q; } catch (e) { }
 function clearCode() { CODE = null; try { sessionStorage.removeItem('arrupe-code'); } catch (e) { } }
@@ -174,6 +177,7 @@ function demoPastoral(base) {
         { id: 'a4', fecha: new Date(Date.now() - 26 * 3600000).toISOString(), tipo: 'cuenta', titulo: 'Cuenta pendiente de aprobar: Paula Rentero Gil', detalle: 'paula.rentero@gmail.com', vista: 'panel', leida: false },
         { id: 'a5', fecha: new Date(Date.now() - 50 * 3600000).toISOString(), tipo: 'baja', titulo: 'Irene Sola ha dejado Residencia de Ancianos', detalle: 'Baja desde la app', vista: 'personas', leida: true }
       ],
+      reflexion: { total: 38, semana: 9, semanas: [2, 4, 5, 7, 11, 9], personas: 21, voluntarios: 34, personas28: 18, asistencias28: 64, trasSesion28: 29, porEntidad: [{ id: 'hogar', n: 12 }, { id: 'ute', n: 9 }, { id: 'apoyo', n: 8 }, { id: 'down', n: 5 }, { id: 'apro', n: 4 }] },
       sesiones: [], hojaUrl: '', carpetaUrl: '', multimediaUrl: ''
     },
     incidencias: [
@@ -230,7 +234,8 @@ function demoData(role) {
     mio: { asignaciones: [{ entidad: 'hogar', estado: 'activa' }, { entidad: 'apoyo', estado: 'activa' }],
       docs: { cert: { estado: 'ok', fecha: dIso(-12), nota: '' }, comp: { estado: 'pend', fecha: '', nota: '' } },
       horas: [{ fecha: dIso(-2), entidad: 'hogar', horas: 2 }, { fecha: dIso(-6), entidad: 'apoyo', horas: 2 }, { fecha: dIso(-7), entidad: 'hogar', horas: 2 }, { fecha: dIso(-9), entidad: 'hogar', horas: 1 }, { fecha: dIso(-13), entidad: 'apoyo', horas: 2 }, { fecha: dIso(-16), entidad: 'hogar', horas: 2 }, { fecha: dIso(-20), entidad: 'apoyo', horas: 2 }],
-      reflexiones: [{ fecha: dIso(-7), texto: 'Hoy Aitana me ha enseñado su cuaderno de dibujos. No sabía que llevaba semanas esperando a que se lo pidiera.' }],
+      reflexiones: [{ fecha: dIso(-7), texto: 'Hoy Aitana me ha enseñado su cuaderno de dibujos. No sabía que llevaba semanas esperando a que se lo pidiera.', entidad: 'hogar', sesion: 'x1', palabra: 'esperar' }, { fecha: dIso(-13), texto: 'Me costó que me hicieran caso con los deberes. Al final, un chiste lo cambió todo.', entidad: 'apoyo', sesion: 'x2', palabra: 'humor' }],
+      reflexionTotal: 2, sesionesAsistidas: 7, sinReflexion: [{ sesion: 'demo-s1', entidad: 'hogar', fecha: dIso(-1) }, { sesion: 'demo-s2', entidad: 'apoyo', fecha: dIso(-6) }],
       compromiso: null, turnos: demoTurnos().map(t => Object.assign({}, t, { apuntado: t.id === 't1' || t.id === 't4' })), proximos: demoProximos('vol'), misSubidas: 1 }
   });
 }
@@ -250,7 +255,7 @@ function demoApi(action, d) {
   const D2 = DEMO, me = D2.me, short = n => { const p = n.split(' '); return p[0] + ' ' + p[1][0] + '.'; };
   switch (action) {
     case 'bootstrap': return D2;
-    case 'guardarReflexion': D2.mio.reflexiones.unshift({ fecha: todayISO(), texto: d.texto }); return D2;
+    case 'guardarReflexion': { const p = (D2.mio.sinReflexion || []).find(x => x.sesion === d.sesion); D2.mio.reflexiones.unshift({ fecha: todayISO(), texto: d.texto, palabra: String(d.palabra || '').split(/\s+/)[0], sesion: d.sesion || '', entidad: p ? p.entidad : '' }); D2.mio.sinReflexion = (D2.mio.sinReflexion || []).filter(x => x.sesion !== d.sesion); D2.mio.reflexionTotal = (D2.mio.reflexionTotal || 0) + 1; return D2; }
     case 'subirDocumento': D2.mio.docs[d.tipo] = { estado: 'rev', fecha: todayISO(), nota: '' }; return D2;
     case 'solicitarEntidad': D2.mio.asignaciones.push({ entidad: d.entidad, estado: 'solicitada' }); return D2;
     case 'dejarEntidad': D2.mio.asignaciones = D2.mio.asignaciones.filter(x => x.entidad !== d.entidad); return D2;
@@ -322,7 +327,7 @@ async function api(action, data) {
   }
   return out.data;
 }
-const CELEBRA = { firmarCompromiso: 1, confirmarAsistencia: 1, darBienvenida: 1, asignarInscripciones: 1, enviarAgradecimiento: 1, registrarSesion: 1, crearInvitaciones: 1, invitarVoluntarios: 1, solicitarEntidad: 1 };
+const CELEBRA = { guardarReflexion: 1, firmarCompromiso: 1, confirmarAsistencia: 1, darBienvenida: 1, asignarInscripciones: 1, enviarAgradecimiento: 1, registrarSesion: 1, crearInvitaciones: 1, invitarVoluntarios: 1, solicitarEntidad: 1 };
 async function run(action, data, okMsg) {
   $('busy').hidden = false;
   try {
@@ -346,7 +351,7 @@ async function load() {
   S.err = '';
   $('root').innerHTML = '<div class="boot"><div class="spinner" role="status" aria-label="Cargando"></div></div>';
   render.animate = true;
-  try { D = await api('bootstrap'); }
+  try { D = await api('bootstrap'); if (REFL_START && D && D.mio) { S.rses = (D.mio.sinReflexion || []).some(p => p.sesion === REFL_START) ? REFL_START : undefined; S.view = 'reflexion'; REFL_START = null; } }
   catch (e) { S.err = e.message; D = null; if (TOKEN) { TOKEN = null; try { sessionStorage.removeItem('arrupe-token'); } catch (x) { } } }
   if (D && CODE) {
     const c = caps();
@@ -387,13 +392,14 @@ function nav() {
   const n = [];
   if (c.isP) n.push(['panel', 'Panel', 'chart'], ['avisos', 'Avisos', 'bell'], ['ins', 'Inscripciones', 'inbox'], ['personas', 'Personas', 'users'], ['invitaciones', 'Invitaciones', 'mail'], ['entidades', 'Entidades', 'building']);
   if (c.isC) n.push(['cinicio', 'Mi entidad', 'building'], ['equipo', 'Equipo', 'users'], ['chorario', 'Horarios', 'calendar'], ['asistencia', 'Asistencia', 'check']);
-  if (c.isVol) n.push(['vinicio', 'Mi voluntariado', 'home'], ['horario', 'Mi horario', 'calendar'], ['docs', 'Documentos', 'file'], ['horas', 'Mis horas', 'clock']);
+  if (c.isVol) n.push(['vinicio', 'Mi voluntariado', 'home'], ['reflexion', 'Con qué me quedo', 'feather'], ['horario', 'Mi horario', 'calendar'], ['docs', 'Documentos', 'file'], ['horas', 'Mis horas', 'clock']);
   if (c.isVol || c.isC) n.push(['fotos', 'Fotos y vídeos', 'camera']);
   if (!c.isP) n.push(['datos', 'Mis datos', 'user']);
   n.push(['explorar', 'Dónde servir', 'compass'], ['noticias', 'Noticias', 'news'], ['soporte', c.isP ? 'Incidencias' : 'Ayuda', 'life']);
   return n;
 }
 function badge(k) {
+  if (k === 'reflexion') return D.mio && D.mio.sinReflexion ? D.mio.sinReflexion.length : 0;
   if (k === 'soporte') return D.incidencias ? D.incidencias.filter(x => x.estado === 'abierta').length : 0;
   if (!D.pastoral) return 0;
   if (k === 'ins') return D.pastoral.inscripciones.filter(i => i.estado === 'nueva').length;
@@ -540,13 +546,7 @@ function vVinicio() {
     : `<div class="empty">Aún no tienes un voluntariado asignado. <button class="btn primary sm" data-go="explorar">Descubre dónde servir</button></div>`}
   ${sol.length ? `<div class="card"><h3>Solicitudes en curso</h3><div class="chips">${sol.map(a => chip(a.entidad)).join('')}</div><p class="hint">Pastoral te responderá por correo.</p></div>` : ''}
   <div class="grid g2">
-    <div class="card examen"><span class="eyebrow">Para mirar la semana</span>
-      <p class="quote">¿Dónde has encontrado vida en tu voluntariado esta semana? ¿Y qué te ha costado?</p>
-      <p class="muted small">Dos minutos para mirar lo vivido. Nadie más lo ve en la app.</p>
-      <div class="field"><label for="refl">Lo que me llevo</label><textarea id="refl" maxlength="3000" placeholder="Un momento, una cara, una dificultad…"></textarea></div>
-      <button class="btn primary" data-act="save-refl" style="justify-self:start">Guardar para mí</button>
-      ${D.mio.reflexiones.length ? `<details><summary class="small muted" style="cursor:pointer">Lo que has ido guardando (${D.mio.reflexiones.length})</summary><div class="grid" style="gap:10px;margin-top:10px">${D.mio.reflexiones.slice(0, 6).map(r => `<div class="refl"><span class="hint">${fmtLong(r.fecha)}</span><p>${esc(r.texto)}</p></div>`).join('')}</div></details>` : ''}
-    </div>
+    ${reflCard()}
     <div class="card"><div style="display:flex;justify-content:space-between;align-items:center"><h2>Lo que viene</h2><button class="btn ghost sm" data-go="noticias">Ver todo</button></div>
       ${proximas().length ? `<div class="list">${proximas().slice(0, 3).map(newsRow).join('')}</div>` : '<p class="muted small">No hay encuentros próximos publicados.</p>'}</div>
   </div>`;
@@ -670,6 +670,18 @@ function vAvisos() {
     `<div class="card"><h2>Sin leer${sin.length ? ` · ${sin.length}` : ''}</h2>${sin.length ? `<div class="list">${sin.map(avisoRow).join('')}</div>` : '<div class="empty">Estáis al día.</div>'}</div>
     ${leidas.length ? `<details class="card"><summary style="cursor:pointer;font-weight:600">Leídos recientemente (${leidas.length})</summary><div class="list">${leidas.map(avisoRow).join('')}</div></details>` : ''}`;
 }
+function reflStats() {
+  const r = D.pastoral.reflexion; if (!r) return '';
+  const pct = (a, b) => b ? Math.round(a / b * 100) : 0, max = Math.max(1, ...r.semanas);
+  return `<div class="card refl-stats"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><h2>¿Con qué me quedo? · reflexión</h2><span class="hint">Solo recuento: el contenido es privado</span></div>
+    <div class="refl-grid"><div class="kpis">
+      <div class="kpi"><b class="tnum">${r.total}</b><span>reflexiones en total</span></div>
+      <div class="kpi"><b class="tnum">${r.semana}</b><span>esta semana</span></div>
+      <div class="kpi"><b class="tnum">${r.personas}/${r.voluntarios}</b><span>personas que han reflexionado</span></div>
+      <div class="kpi ${r.asistencias28 && pct(r.trasSesion28, r.asistencias28) < 30 ? 'alert' : ''}"><b class="tnum">${pct(r.trasSesion28, r.asistencias28)}%</b><span>de las asistencias de las últimas 4 semanas, con reflexión</span></div></div>
+    <div><span class="small muted">Reflexiones por semana</span><div class="spark" role="img" aria-label="Reflexiones en las últimas seis semanas: ${r.semanas.join(', ')}">${r.semanas.map((v, i) => `<div><i style="height:${Math.max(4, v / max * 100)}%"></i><span class="tnum">${v}</span><small>${i === 5 ? 'esta' : '−' + (5 - i)}</small></div>`).join('')}</div></div></div>
+    ${r.porEntidad.length ? `<div class="chips"><span class="small muted">Por entidad:</span>${r.porEntidad.map(x => `<span class="chip" style="--c:${cvar(E(x.id).color)}">${esc(E(x.id).nombre)} · ${x.n}</span>`).join('')}</div>` : ''}</div>`;
+}
 function vPanel() {
   const P = D.pastoral.personas, act = P.filter(p => p.estado === 'activo' && p.asignaciones.some(a => a.estado === 'activa'));
   const inc = act.filter(p => p.docs.cert.estado !== 'ok' || p.docs.comp.estado !== 'ok').length;
@@ -688,6 +700,7 @@ function vPanel() {
       ${pp.solicitudes.map(s => `<div class="row"><span class="pill info">Solicitud</span><div class="grow"><b>${esc(s.p.nombre)}</b><span class="small muted">quiere servir en ${esc(E(s.ent).nombre)}</span></div><button class="btn primary sm" data-req="${esc(s.p.email)}|${esc(s.ent)}|1">Aceptar</button><button class="btn ghost sm" data-req="${esc(s.p.email)}|${esc(s.ent)}|0">Rechazar</button></div>`).join('')}
       ${pp.docs.map(x => `<div class="row"><span class="pill info">Documento</span><div class="grow"><b>${esc(x.p.nombre)}</b><span class="small muted">${esc(D.config.tiposDoc[x.t])}</span></div><button class="btn ghost sm" data-editp="${esc(x.p.email)}">Revisar</button></div>`).join('')}
     </div>` : '<div class="empty">Nada pendiente. Buen trabajo.</div>'}</div>
+  ${reflStats()}
   <div class="grid g2">
    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2>Ocupación por entidad</h2><button class="btn ghost sm" data-go="entidades">Gestionar</button></div>
      <div class="list">${D.entidades.filter(e => e.activa).map(e => `<div class="row" style="--c:${cvar(e.color)}"><div class="grow" style="display:grid;gap:6px"><div style="display:flex;justify-content:space-between;gap:8px"><b style="display:inline">${esc(e.nombre)}</b><span class="tnum small muted">${e.ocupadas}/${e.cupo}</span></div><div class="bar"><i style="width:${e.cupo ? Math.min(100, e.ocupadas / e.cupo * 100) : 0}%"></i></div></div></div>`).join('')}</div></div>
@@ -915,6 +928,39 @@ function gcal(t, ent) {
 const turnoTxt = t => t.tipo === 'semanal' ? `Cada ${DIAS[t.dia]} · ${esc(t.inicio)}–${esc(t.fin)}` : `${fmtLong(t.fecha)} · ${esc(t.inicio)}–${esc(t.fin)}`;
 const calBtn = (t, ent) => `<a class="btn ghost sm" href="${esc(gcal(t, ent))}" target="_blank" rel="noopener">${ic('calendar', 16)}Añadir a Google Calendar</a>`;
 function respPill(r) { return r === 'sí' ? '<span class="pill ok">Confirma</span>' : r === 'no' ? '<span class="pill bad">No puede</span>' : '<span class="pill" style="background:var(--surface-2);color:var(--fg-3)">Sin respuesta</span>'; }
+/* --- reflexión: ¿con qué me quedo hoy? --- */
+const PREG = [
+  ['¿Qué momento de hoy se te ha quedado dentro?', '¿Qué te ha costado o te ha removido?', '¿Qué te llevas para la maestra o el maestro que serás?'],
+  ['¿Qué cara o qué gesto recuerdas de hoy?', '¿Dónde te has sentido más tú?', '¿Qué te gustaría hacer distinto la próxima vez?'],
+  ['¿Qué has recibido hoy sin esperarlo?', '¿Qué te ha pesado?', '¿Qué quieres cuidar en la próxima sesión?']
+];
+const pregDe = key => PREG[Math.abs(String(key || 'x').split('').reduce((a, ch) => a + ch.charCodeAt(0), 0)) % PREG.length];
+const cuando = f => f === todayISO() ? 'Hoy' : f === new Date(Date.now() - 864e5 - new Date().getTimezoneOffset() * 6e4).toISOString().slice(0, 10) ? 'Ayer' : fmtLong(f).replace(/^./, c => c.toUpperCase());
+function reflCard() {
+  const pend = (D.mio.sinReflexion || [])[0], n = D.mio.reflexionTotal || D.mio.reflexiones.length;
+  if (pend) { const e = E(pend.entidad); return `<div class="card refl-hero" style="--c:${cvar(e.color)}"><span class="eyebrow">${cuando(pend.fecha)} estuviste en ${esc(e.nombre)}</span>
+    <p class="quote">¿Con qué te quedas?</p><p class="muted">Dos minutos para mirar lo vivido antes de que el día lo tape todo. Solo lo lees tú.</p>
+    <button class="btn primary" data-reflses="${esc(pend.sesion)}" style="justify-self:start">${ic('feather', 18)}Escribir con qué me quedo</button></div>`; }
+  return `<div class="card refl-hero"><span class="eyebrow">Para mirar lo vivido</span><p class="quote">¿Con qué me quedo hoy?</p>
+    <p class="muted">${n ? `Llevas ${n} ${n === 1 ? 'reflexión guardada' : 'reflexiones guardadas'}. ` : ''}Un momento, una cara, una dificultad. Solo lo lees tú.</p>
+    <button class="btn ghost" data-go="reflexion" style="justify-self:start">${ic('feather', 18)}Abrir mi cuaderno</button></div>`;
+}
+function vReflexion() {
+  const pend = D.mio.sinReflexion || [], R = D.mio.reflexiones || [];
+  if (S.rses === undefined) S.rses = pend[0] ? pend[0].sesion : '';
+  const sel = pend.find(p => p.sesion === S.rses), q = pregDe(S.rses || todayISO());
+  const tras = R.filter(r => r.sesion).length, asist = D.mio.sesionesAsistidas || 0;
+  return header('Mi cuaderno', '¿Con qué me quedo hoy?', 'Un espacio para mirar lo vivido en el voluntariado. Lo que escribes aquí es solo tuyo: nadie más puede leerlo, tampoco Pastoral.') +
+  `<div class="grid g2" style="align-items:start"><div class="card refl-write" style="--c:${sel ? cvar(E(sel.entidad).color) : 'var(--brand)'}">
+    ${pend.length ? `<div style="display:grid;gap:8px"><span class="small muted">¿Sobre qué sesión?</span><div class="filters" role="group" aria-label="Sesión">${pend.slice(0, 4).map(p => `<button data-rsel="${esc(p.sesion)}" aria-pressed="${S.rses === p.sesion}">${esc(E(p.entidad).nombre)} · ${cuando(p.fecha).toLowerCase()}</button>`).join('')}<button data-rsel="" aria-pressed="${!S.rses}">Sin sesión concreta</button></div></div>` : ''}
+    <ol class="preg">${q.map(x => `<li>${esc(x)}</li>`).join('')}</ol>
+    <div class="field"><label for="refl">Con qué me quedo</label><textarea id="refl" maxlength="3000" style="min-height:170px" placeholder="Escribe sin pensar demasiado. No hay respuestas correctas.">${esc(S.rtxt || '')}</textarea></div>
+    <div class="field"><label for="reflW">Una palabra que me llevo en el bolsillo (opcional)</label><input type="text" id="reflW" maxlength="40" value="${esc(S.rword || '')}" placeholder="Ej.: paciencia" style="max-width:320px"></div>
+    <button class="btn primary" data-act="save-refl" style="justify-self:start">${ic('check', 18)}Guardar para mí</button></div>
+  <div class="grid" style="gap:18px"><div class="kpis"><div class="kpi"><b class="tnum">${D.mio.reflexionTotal || R.length}</b><span>reflexiones guardadas</span></div><div class="kpi"><b class="tnum">${tras}/${asist}</b><span>sesiones con reflexión</span></div></div>
+    <div class="card"><h2>Mis palabras</h2>${R.some(r => r.palabra) ? `<div class="words">${R.filter(r => r.palabra).slice(0, 18).map((r, i) => `<span style="--c:${cvar(COLORS[i % 8])}">${esc(r.palabra)}</span>`).join('')}</div>` : '<p class="muted small">Aquí irán apareciendo las palabras que elijas.</p>'}</div>
+    <div class="card"><h2>Lo que he ido guardando</h2>${R.length ? `<div class="grid" style="gap:12px">${R.slice(0, 12).map(r => `<div class="refl"><span class="hint">${fmtLong(r.fecha)}${r.entidad ? ' · ' + esc(E(r.entidad).nombre) : ''}${r.palabra ? ' · <b>' + esc(r.palabra) + '</b>' : ''}</span><p>${esc(r.texto)}</p></div>`).join('')}</div>` : '<p class="muted small">Todavía no has guardado nada. Tu primera reflexión aparecerá aquí.</p>'}</div></div></div>`;
+}
 function vHorario() {
   const ents = misEnts(), T = D.mio.turnos || [], P = D.mio.proximos || [];
   return header('Horario', 'Tu horario', 'Los turnos y encuentros que fija tu coordinación. El día antes te llega un recordatorio por correo para confirmar.') +
@@ -1020,6 +1066,7 @@ function vDatos() {
     <div class="field"><label for="mEmN">Contacto de emergencia</label><input type="text" id="mEmN" value="${esc(me.emergenciaNombre)}" placeholder="Nombre y parentesco"></div>
     <div class="field"><label for="mEmT">Teléfono de emergencia</label><input type="text" inputmode="tel" id="mEmT" value="${esc(me.emergenciaTelefono)}"></div>
     <label class="check wide" for="mAvisos"><input type="checkbox" id="mAvisos" ${me.avisos ? 'checked' : ''}>Quiero recibir el recordatorio por correo el día antes de cada encuentro</label>
+    <label class="check wide" for="mAvisosR"><input type="checkbox" id="mAvisosR" ${me.avisosReflexion !== false ? 'checked' : ''}>Quiero recibir la invitación “¿Con qué te quedas?” después de cada sesión</label>
   </div><button class="btn primary" data-act="save-datos" style="justify-self:start">${ic('check', 18)}Guardar cambios</button></div>`;
 }
 
@@ -1117,7 +1164,7 @@ function vSoporte() {
 }
 
 /* ───────── render ───────── */
-const VIEWS = { soporte: vSoporte, avisos: vAvisos, horario: vHorario, chorario: vChorario, compromiso: vCompromiso, datos: vDatos, fotos: vFotos, espera: vEspera, explorar: vExplorar, vinicio: vVinicio, docs: vDocs, horas: vHoras, cinicio: vCinicio, equipo: vEquipo, asistencia: vAsistencia, panel: vPanel, ins: vIns, personas: vPersonas, invitaciones: vInvitaciones, entidades: vEntidades, noticias: vNoticias };
+const VIEWS = { reflexion: vReflexion, soporte: vSoporte, avisos: vAvisos, horario: vHorario, chorario: vChorario, compromiso: vCompromiso, datos: vDatos, fotos: vFotos, espera: vEspera, explorar: vExplorar, vinicio: vVinicio, docs: vDocs, horas: vHoras, cinicio: vCinicio, equipo: vEquipo, asistencia: vAsistencia, panel: vPanel, ins: vIns, personas: vPersonas, invitaciones: vInvitaciones, entidades: vEntidades, noticias: vNoticias };
 function render() {
   const root = $('root');
   if (!D) {
@@ -1183,6 +1230,8 @@ root.addEventListener('click', async ev => {
   if (d.incopen) { S.incOpen = S.incOpen === d.incopen ? null : d.incopen; return render(); }
   if (d.incres) { const r = ($('incR-' + d.incres) || {}).value || ''; return run('resolverIncidencia', { id: d.incres, respuesta: r.trim() }, r.trim() ? 'Resuelta. Le hemos enviado tu respuesta.' : 'Marcada como resuelta'); }
   if (d.increopen) return run('resolverIncidencia', { id: d.increopen, reabrir: true }, 'Incidencia reabierta');
+  if (d.reflses) { S.rses = d.reflses; return go('reflexion'); }
+  if (d.rsel !== undefined) { S.rtxt = ($('refl') || {}).value || S.rtxt; S.rword = ($('reflW') || {}).value || S.rword; S.rses = d.rsel; return render(); }
   if (d.conf) { const [turno, fecha, respuesta] = d.conf.split('|'); return run('confirmarAsistencia', { turno, fecha, respuesta }, respuesta === 'sí' ? '¡Gracias! Asistencia confirmada' : 'Hemos avisado a tu coordinación'); }
   if (d.tftipo) { S.tf = Object.assign(S.tf || {}, readTf(), { tipo: d.tftipo }); return render(); }
   if (d.askdelt) { S.delT = d.askdelt; return render(); }
@@ -1251,7 +1300,7 @@ root.addEventListener('click', async ev => {
       return;
     }
     case 'save-datos': {
-      const data = { nombre: $('mNombre').value.trim(), curso: $('mCurso').value.trim(), telefono: $('mTel').value.trim(), emailContacto: $('mEmailC').value.trim(), emergenciaNombre: $('mEmN').value.trim(), emergenciaTelefono: $('mEmT').value.trim(), avisos: $('mAvisos').checked };
+      const data = { nombre: $('mNombre').value.trim(), curso: $('mCurso').value.trim(), telefono: $('mTel').value.trim(), emailContacto: $('mEmailC').value.trim(), emergenciaNombre: $('mEmN').value.trim(), emergenciaTelefono: $('mEmT').value.trim(), avisos: $('mAvisos').checked, avisosReflexion: $('mAvisosR').checked };
       if (data.nombre.length < 3) return toast('Escribe tu nombre y apellidos');
       return run('guardarMisDatos', data, 'Datos guardados');
     }
@@ -1285,7 +1334,12 @@ root.addEventListener('click', async ev => {
     case 'leave': S.leaving = S.ent; return render();
     case 'leave-no': S.leaving = null; return render();
     case 'leave-yes': { const ent = S.ent; S.leaving = null; return run('dejarEntidad', { entidad: ent }, 'Has dejado este voluntariado. Tu coordinación lo sabrá.'); }
-    case 'save-refl': { const v = $('refl').value.trim(); if (!v) return toast('Escribe algo antes de guardar'); return run('guardarReflexion', { texto: v }, 'Guardado.'); }
+    case 'save-refl': {
+      const v = $('refl').value.trim(); if (!v) return toast('Escribe algo antes de guardar');
+      const r = await run('guardarReflexion', { texto: v, palabra: ($('reflW') || {}).value || '', sesion: S.rses || '' }, 'Guardado en tu cuaderno. Solo lo lees tú.');
+      if (r) { S.rtxt = ''; S.rword = ''; S.rses = undefined; render.animate = true; render(); }
+      return;
+    }
     case 'remind': return run('recordarDocumentos', { entidad: S.cent }, r => r && r.enviados ? `Recordatorio enviado a ${r.enviados} ${r.enviados === 1 ? 'persona' : 'personas'}` : 'No había nadie a quien recordar');
     case 'copy-emails': {
       const txt = D.coord[S.cent].equipo.map(p => p.email).join(', ');
@@ -1386,6 +1440,8 @@ root.addEventListener('input', ev => {
   if (/^c(Nombre|Dni|Tel|Curso|Act|Firma)$/.test(ev.target.id)) readCf();
   if (ev.target.id === 'wMsg') S.wMsg = ev.target.value;
   if (ev.target.id === 'incAs') S.inc.asunto = ev.target.value;
+  if (ev.target.id === 'refl') S.rtxt = ev.target.value;
+  if (ev.target.id === 'reflW') S.rword = ev.target.value;
   if (ev.target.id === 'incDe') S.inc.desc = ev.target.value;
   if (ev.target.id === 'wWa') S.wWa = ev.target.value;
   if (ev.target.id === 'q') { S.q = ev.target.value; const pos = ev.target.selectionStart; render(); const q = $('q'); q.focus(); q.setSelectionRange(pos, pos); }

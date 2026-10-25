@@ -3,8 +3,8 @@
   "short_name": "Arrupe",
   "start_url": "./",
   "display": "standalone",
-  "background_color": "#F5F8FB",
-  "theme_color": "#12679A",
+  "background_color": "#0D2034",
+  "theme_color": "#0D2034",
   "lang": "es",
   "icons": [
     {

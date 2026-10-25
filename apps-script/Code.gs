@@ -38,7 +38,7 @@ const CONFIG = {
 };
 
 // Versión del script. La web la compara con la suya para avisar si hay que actualizar Code.gs.
-const VERSION_API = '2026-10-25b';
+const VERSION_API = '2026-10-25c';
 
 const TIPOS_DOC = {
   cert: 'Certificado de delitos de naturaleza sexual',
@@ -46,14 +46,14 @@ const TIPOS_DOC = {
 };
 
 const HOJAS = {
-  Usuarios: ['email', 'nombre', 'rol', 'estado', 'curso', 'coordEnts', 'alta', 'telefono', 'emailContacto', 'emergenciaNombre', 'emergenciaTelefono', 'avisos', 'ultimoAcceso'],
+  Usuarios: ['email', 'nombre', 'rol', 'estado', 'curso', 'coordEnts', 'alta', 'telefono', 'emailContacto', 'emergenciaNombre', 'emergenciaTelefono', 'avisos', 'ultimoAcceso', 'avisosReflexion'],
   Entidades: ['id', 'nombre', 'lugar', 'etiqueta', 'color', 'descripcion', 'horario', 'cupo', 'ig', 'activa', 'claves', 'whatsapp', 'editadoPor', 'editado'],
   Asignaciones: ['email', 'entidad', 'estado', 'fecha', 'origen'],
   Inscripciones: ['id', 'fecha', 'nombre', 'email', 'curso', 'preferencias', 'preferenciasTexto', 'motivo', 'estado', 'entidad', 'gestionadoPor', 'avisado'],
   Documentos: ['email', 'tipo', 'estado', 'fileId', 'archivo', 'fecha', 'revisadoPor', 'fechaRevision', 'nota'],
   Asistencia: ['sesion', 'fecha', 'entidad', 'email', 'horas', 'registradoPor', 'creado'],
   Noticias: ['id', 'fecha', 'titulo', 'detalle', 'tipo', 'autor'],
-  Reflexiones: ['email', 'fecha', 'texto'],
+  Reflexiones: ['email', 'fecha', 'texto', 'sesion', 'entidad', 'palabra'],
   Registro: ['fecha', 'email', 'accion', 'detalle'],
   Compromisos: ['email', 'nombre', 'dni', 'telefono', 'curso', 'entidades', 'actividades', 'desde', 'hasta', 'acepta', 'firma', 'fecha'],
   Turnos: ['id', 'entidad', 'tipo', 'dia', 'fecha', 'inicio', 'fin', 'lugar', 'nota', 'activo', 'creadoPor', 'creado'],
@@ -271,10 +271,18 @@ const ACCIONES = {
     log_(me, 'subirDocumento', d.tipo);
     return bootstrap_(me);
   },
+  // Reflexión privada: nadie más la ve. Pastoral solo conoce cuántas hay.
   guardarReflexion: (me, d) => {
     const t = String(d.texto || '').trim().slice(0, 3000);
     if (!t) throw httpErr_('Escribe algo antes de guardar');
-    append_('Reflexiones', { email: me.email, fecha: new Date(), texto: t });
+    const palabra = String(d.palabra || '').trim().split(/\s+/)[0].slice(0, 40);
+    let sesion = '', entidad = '';
+    if (d.sesion) {
+      const a = rows_('Asistencia').find(r => String(r.sesion) === String(d.sesion) && r.email === me.email);
+      if (a) { sesion = String(a.sesion); entidad = a.entidad; }
+    }
+    withLock_(() => append_('Reflexiones', { email: me.email, fecha: new Date(), texto: t, sesion, entidad, palabra }));
+    log_(me, 'guardarReflexion', sesion ? 'tras sesión' : 'libre');
     return bootstrap_(me);
   },
 
@@ -292,6 +300,8 @@ const ACCIONES = {
     const sesion = Utilities.getUuid().slice(0, 8);
     withLock_(() => emails.forEach(email => append_('Asistencia', { sesion, fecha, entidad: ent.id, email, horas, registradoPor: me.email, creado: new Date() })));
     log_(me, 'registrarSesion', ent.id + ' · ' + emails.length + ' personas');
+    // Invitación a reflexionar: solo para sesiones de hoy o de ayer
+    if (iso_(fecha) >= hoyISO_(-1)) emails.forEach(email => { try { invitarReflexion_(email, ent, sesion, iso_(fecha)); } catch (e) { Logger.log(e); } });
     return bootstrap_(me);
   },
   borrarSesion: (me, d) => {
@@ -581,7 +591,7 @@ const ACCIONES = {
     withLock_(() => updateWhere_('Usuarios', u => u.email === me.email, {
       nombre, curso: String(d.curso || '').trim(), telefono: txt_(tel), emailContacto: ec,
       emergenciaNombre: String(d.emergenciaNombre || '').trim(), emergenciaTelefono: txt_(String(d.emergenciaTelefono || '').trim()),
-      avisos: d.avisos === false ? 'no' : 'sí'
+      avisos: d.avisos === false ? 'no' : 'sí', avisosReflexion: d.avisosReflexion === false ? 'no' : 'sí'
     }));
     log_(me, 'guardarMisDatos', '');
     return bootstrap_(findUser_(me.email));
@@ -807,7 +817,7 @@ function bootstrap_(me) {
 
   const out = {
     me: { email: me.email, nombre: me.nombre, rol: me.rol, estado: me.estado, curso: me.curso, coordEnts: splitList_(me.coordEnts), foto: me.foto,
-      telefono: String(me.telefono || ''), emailContacto: me.emailContacto || '', emergenciaNombre: me.emergenciaNombre || '', emergenciaTelefono: String(me.emergenciaTelefono || ''), avisos: String(me.avisos) !== 'no' },
+      telefono: String(me.telefono || ''), emailContacto: me.emailContacto || '', emergenciaNombre: me.emergenciaNombre || '', emergenciaTelefono: String(me.emergenciaTelefono || ''), avisos: String(me.avisos) !== 'no', avisosReflexion: String(me.avisosReflexion) !== 'no' },
     config: { horasReferencia: CONFIG.HORAS_REFERENCIA, tiposDoc: TIPOS_DOC, finCurso: CONFIG.FIN_CURSO, hoy: hoyISO_(0) },
     entidades, noticias, version: VERSION_API
   };
@@ -817,8 +827,15 @@ function bootstrap_(me) {
     asignaciones: asigs.filter(a => a.email === me.email && a.estado !== 'baja').map(a => ({ entidad: a.entidad, estado: a.estado })),
     docs: Object.keys(TIPOS_DOC).reduce((o, t) => { const r = docs.find(x => x.email === me.email && x.tipo === t); o[t] = { estado: r ? r.estado : 'pend', fecha: r ? iso_(r.fechaRevision || r.fecha) : '', nota: r ? r.nota : '' }; return o; }, {}),
     horas: asis.filter(a => a.email === me.email).map(a => ({ fecha: iso_(a.fecha), entidad: a.entidad, horas: Number(a.horas) })).sort((a, b) => a.fecha < b.fecha ? 1 : -1),
-    reflexiones: rows_('Reflexiones').filter(r => r.email === me.email).map(r => ({ fecha: iso_(r.fecha), texto: r.texto })).reverse().slice(0, 20)
+    reflexiones: rows_('Reflexiones').filter(r => r.email === me.email).map(r => ({ fecha: iso_(r.fecha), texto: r.texto, sesion: String(r.sesion || ''), entidad: r.entidad || '', palabra: r.palabra || '' })).reverse().slice(0, 40)
   };
+  // Sesiones a las que he ido en los últimos 10 días y sobre las que aún no he reflexionado
+  const misRefl = rows_('Reflexiones').filter(r => r.email === me.email);
+  const yaRefl = new Set(misRefl.map(r => String(r.sesion || '')).filter(Boolean));
+  out.mio.reflexionTotal = misRefl.length;
+  out.mio.sinReflexion = asis.filter(a => a.email === me.email && daysAgo_(a.fecha) <= 10 && !yaRefl.has(String(a.sesion)))
+    .map(a => ({ sesion: String(a.sesion), entidad: a.entidad, fecha: iso_(a.fecha) })).sort((a, b) => a.fecha < b.fecha ? 1 : -1);
+  out.mio.sesionesAsistidas = asis.filter(a => a.email === me.email).length;
   const comp = rows_('Compromisos').find(r => r.email === me.email);
   out.mio.compromiso = comp ? { nombre: comp.nombre, dni: String(comp.dni), telefono: String(comp.telefono), curso: comp.curso, entidades: splitList_(comp.entidades), actividades: comp.actividades, desde: iso_(comp.desde), hasta: iso_(comp.hasta), fecha: iso_(comp.fecha) } : null;
   const turnos = rows_('Turnos').filter(t => t.activo !== 'no').map(turnoOut_);
@@ -904,6 +921,19 @@ function bootstrap_(me) {
       notificaciones: rows_('Notificaciones').slice(-60).reverse().map(n => ({ id: String(n.id), fecha: n.fecha instanceof Date ? n.fecha.toISOString() : String(n.fecha), tipo: n.tipo, titulo: n.titulo, detalle: n.detalle, vista: n.vista, leida: splitList_(n.leidaPor).indexOf(me.email) >= 0 })),
       hojaUrl: SpreadsheetApp.openById(prop_('SHEET_ID')).getUrl(),
       multimediaUrl: carpetaMediaRaiz_().getUrl(),
+      reflexion: (() => {
+        const R = rows_('Reflexiones');
+        const activos = new Set(asigs.filter(a => a.estado === 'activa').map(a => a.email));
+        const semanas = []; for (let k = 5; k >= 0; k--) semanas.push(R.filter(r => { const d = daysAgo_(r.fecha); return d >= k * 7 && d < (k + 1) * 7; }).length);
+        const asis28 = asis.filter(a => daysAgo_(a.fecha) <= 28), conR = new Set(R.map(r => String(r.sesion || '') + '|' + r.email));
+        return {
+          total: R.length, semana: semanas[5], semanas,
+          personas: new Set(R.map(r => r.email)).size, voluntarios: activos.size,
+          personas28: new Set(R.filter(r => daysAgo_(r.fecha) <= 28).map(r => r.email)).size,
+          asistencias28: asis28.length, trasSesion28: asis28.filter(a => conR.has(String(a.sesion) + '|' + a.email)).length,
+          porEntidad: ents.map(e => ({ id: e.id, n: R.filter(r => r.entidad === e.id).length })).filter(x => x.n)
+        };
+      })(),
       carpetaUrl: DriveApp.getFolderById(prop_('FOLDER_ID')).getUrl()
     };
   }
@@ -1086,6 +1116,34 @@ function asegurarRecordatorios_() {
 }
 /** Por si quieres instalar a mano el envío diario de recordatorios. */
 function instalarRecordatorios() { PropertiesService.getScriptProperties().deleteProperty('TRIG_REC'); asegurarRecordatorios_(); Logger.log('Recordatorio diario instalado a las ' + CONFIG.HORA_RECORDATORIO + ':00'); }
+
+// ───────────────────────── INVITACIÓN A REFLEXIONAR ─────────────────────────
+const PREGUNTAS_REFL = [
+  ['¿Qué momento de hoy se te ha quedado dentro?', '¿Qué te ha costado o te ha removido?', '¿Qué te llevas para la maestra o el maestro que serás?'],
+  ['¿Qué cara o qué gesto recuerdas de hoy?', '¿Dónde te has sentido más tú?', '¿Qué te gustaría hacer distinto la próxima vez?'],
+  ['¿Qué has recibido hoy sin esperarlo?', '¿Qué te ha pesado?', '¿Qué quieres cuidar en la próxima sesión?']
+];
+function invitarReflexion_(email, ent, sesion, fecha) {
+  const u = findUser_(email);
+  if (!u || u.estado !== 'activo' || String(u.avisosReflexion) === 'no') return;
+  const clave = 'refl:' + sesion;
+  if (rows_('Recordatorios').some(r => String(r.turno) === clave && r.email === email)) return;
+  // como mucho una invitación al día por persona
+  if (rows_('Recordatorios').some(r => String(r.turno).indexOf('refl:') === 0 && r.email === email && iso_(r.enviado) === hoyISO_(0))) return;
+  const q = PREGUNTAS_REFL[Math.abs(String(sesion).split('').reduce((s, ch) => s + ch.charCodeAt(0), 0)) % PREGUNTAS_REFL.length];
+  const cuando = fecha === hoyISO_(0) ? 'Hoy' : 'Ayer';
+  const url = CONFIG.APP_URL.replace(/\/?$/, '/') + '?reflexion=' + encodeURIComponent(sesion);
+  mail_([email], (cuando === 'Hoy' ? '¿Con qué te quedas hoy? · ' : '¿Con qué te quedas? · ') + ent.nombre,
+    `<p>Hola, ${esc_(String(u.nombre || '').split(' ')[0])}:</p>
+     <p>${cuando === 'Hoy' ? 'Hoy has estado' : 'Ayer estuviste'} en <b>${esc_(ent.nombre)}</b>. Gracias por ese rato.</p>
+     <p>Antes de que el día lo tape todo, regálate dos minutos para mirar lo vivido:</p>
+     <div style="border-radius:14px;padding:16px 18px;background:#F2F5F9;border-left:4px solid #E58A00;margin:14px 0">
+       <p style="margin:0 0 8px">${esc_(q[0])}</p><p style="margin:0 0 8px">${esc_(q[1])}</p><p style="margin:0">${esc_(q[2])}</p></div>
+     <p>Y si quieres, elige <b>una palabra</b> que te lleves en el bolsillo esta semana.</p>
+     <p style="color:#6E8193;font-size:13px">Lo que escribas es solo para ti: nadie más puede leerlo, tampoco Pastoral.</p>`,
+    'Escribir con qué me quedo', '', '', url);
+  withLock_(() => append_('Recordatorios', { turno: clave, fecha: txt_(fecha), email, enviado: new Date() }));
+}
 
 // ───────────────────────── COMPROMISO ─────────────────────────
 function mailCompromiso_(rec, ents) {
