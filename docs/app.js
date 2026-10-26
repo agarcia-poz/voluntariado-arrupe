@@ -47,7 +47,7 @@ const $ = id => document.getElementById(id);
 const COLORS = ['orange', 'magenta', 'purple', 'brown', 'blue', 'red', 'grey', 'green', 'teal'];
 const cvar = c => `var(--e-${COLORS.includes(c) ? c : 'blue'})`;
 const IG = 'https://www.instagram.com/unisafa/';
-const VERSION_API = '2026-10-26a'; // debe coincidir con la de Code.gs
+const VERSION_API = '2026-10-26b'; // debe coincidir con la de Code.gs
 
 /* ───────── estado ───────── */
 let TOKEN = null, D = null;
@@ -547,7 +547,7 @@ function vVinicio() {
      <div class="kpi"><b class="tnum">${ents.length}</b><span>${ents.length === 1 ? 'voluntariado' : 'voluntariados'}</span></div>
      <div class="kpi ${done < 2 ? 'alert' : ''}"><b class="tnum">${done}/2</b><span>documentos validados</span></div></div>
   ${falta.length ? `<div class="note">${ic('file', 18)}<span>Te falta: <b>${falta.map(t => D.config.tiposDoc[t].toLowerCase()).join(' y ')}</b>. <button class="btn primary sm" data-go="docs" style="margin-left:6px">Ir a documentos</button></span></div>` : ''}
-  ${ents.length ? `<div class="grid g2">${ents.map(id => { const e = E(id), h = horasPor(id); return `<div class="card" style="--c:${cvar(e.color)}"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">${chip(id)}<span class="small muted tnum">${nf(h)} h</span></div><h2>${esc(e.nombre)}</h2><p class="muted small">${esc(e.horario)}</p><div class="bar"><i style="width:${Math.min(100, h / ref * 100)}%"></i></div><span class="hint">Referencia de ${ref} h para el certificado</span><div class="actions"><button class="btn ghost sm" data-ent="${esc(id)}">Ver detalles</button>${e.whatsapp ? `<a class="btn ghost sm" href="${safeUrl(e.whatsapp)}" target="_blank" rel="noopener">${ic('chat', 16)}Grupo de WhatsApp</a>` : ''}</div></div>`; }).join('')}</div>`
+  ${ents.length ? `<div class="grid g2">${ents.map(id => { const e = E(id), h = horasPor(id); return `<div class="card" style="--c:${cvar(e.color)}"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center">${chip(id)}<span class="small muted tnum">${nf(h)} h</span></div><h2>${esc(e.nombre)}</h2><p class="muted small">${esc(e.horario)}</p><div class="bar"><i style="width:${Math.min(100, h / ref * 100)}%"></i></div><span class="hint">Referencia de ${ref} h para el certificado</span><div class="actions"><button class="btn ghost sm" data-ent="${esc(id)}">Ver detalles</button></div></div>`; }).join('')}</div>`
     : `<div class="empty">Aún no tienes un voluntariado asignado. <button class="btn primary sm" data-go="explorar">Descubre dónde servir</button></div>`}
   ${sol.length ? `<div class="card"><h3>Solicitudes en curso</h3><div class="chips">${sol.map(a => chip(a.entidad)).join('')}</div><p class="hint">Pastoral te responderá por correo.</p></div>` : ''}
   <div class="grid g2">
@@ -648,9 +648,9 @@ function welcomeComposer(n, e) {
       <textarea id="wMsg" maxlength="1500" style="min-height:150px" placeholder="Preséntate en pocas líneas: quién eres, qué estudias, cuánto tiempo llevas en ${esc(e.nombre)} y qué te gustaría que viviera en este voluntariado.">${esc(S.wMsg || '')}</textarea>
       <span class="hint">Se envía con tu nombre. Lo que escribas va justo después del saludo “Hola, ${esc(first)}:”.</span></div>
     <button class="signout" data-act="w-ejemplo" style="justify-self:start">Empezar con un ejemplo</button>
-    <div class="field"><label for="wWa">Enlace del grupo de WhatsApp (opcional)</label><input type="text" id="wWa" value="${esc(S.wWa ?? e.whatsapp ?? '')}" placeholder="https://chat.whatsapp.com/…">
-      <span class="hint">${e.whatsapp ? 'Es el enlace guardado para tu entidad.' : 'Si aún no existe el grupo, el correo avisa de que se va a crear y pide que tenga su teléfono en Mis datos.'} El enlace se guarda para el resto de coordinadores.</span></div>
-    <div class="note small">${ic('mail', 18)}<span>Además de tu presentación, el correo incluye el horario y el lugar, el aviso del grupo de WhatsApp y el recordatorio de subir el certificado y firmar el compromiso. Si te responden, la respuesta te llega a ti.</span></div>
+    <div class="field"><label for="wWa">Enlace del grupo de WhatsApp</label><input type="text" id="wWa" value="${esc(S.wWa ?? e.whatsapp ?? '')}" placeholder="https://chat.whatsapp.com/…">
+      <span class="hint">${e.whatsapp ? 'Es el enlace guardado para tu entidad.' : 'Es obligatorio: crea primero el grupo en WhatsApp y pega aquí su enlace de invitación.'} El enlace se guarda para el resto de coordinadores.</span></div>
+    <div class="note small">${ic('mail', 18)}<span>Además de tu presentación, el correo incluye el horario y el lugar, la invitación al grupo de WhatsApp (es el único sitio donde el voluntariado recibe el enlace) y el recordatorio de subir el certificado y firmar el compromiso. Si te responden, la respuesta te llega a ti.</span></div>
     <div class="actions"><button class="btn primary" data-sendwelcome="${esc(n.email)}">${ic('mail', 18)}Enviar bienvenida</button><button class="btn ghost" data-act="w-cancel">Cancelar</button></div></div>`;
 }
 function vEquipo() {
@@ -1024,7 +1024,7 @@ function vChorario() {
       <div class="form-grid"><div class="field wide"><label for="iHor">Horario general</label><input type="text" id="iHor" value="${esc(e.horario)}"></div>
       <div class="field wide"><label for="iLug">Lugar</label><input type="text" id="iLug" value="${esc(e.lugar)}"></div>
       <div class="field wide"><label for="iDesc">Descripción para el alumnado</label><textarea id="iDesc">${esc(e.descripcion)}</textarea></div>
-      <div class="field wide"><label for="iWa">Enlace del grupo de WhatsApp</label><input type="text" id="iWa" value="${esc(e.whatsapp || '')}" placeholder="https://chat.whatsapp.com/…"><span class="hint">Solo lo ve quien forma parte de la entidad.</span></div></div>
+      <div class="field wide"><label for="iWa">Enlace del grupo de WhatsApp</label><input type="text" id="iWa" value="${esc(e.whatsapp || '')}" placeholder="https://chat.whatsapp.com/…"><span class="hint">Solo lo ven la coordinación y Pastoral. El voluntariado lo recibe únicamente en el correo de bienvenida.</span></div></div>
       <div class="actions"><button class="btn primary" data-act="save-info">${ic('check', 18)}Guardar</button><button class="btn ghost" data-act="cancel-info">Cancelar</button></div></div>`
     : `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:center"><h2>Información de ${esc(e.nombre)}</h2><button class="btn ghost sm" data-act="edit-info">${ic('pen', 16)}Editar</button></div>
       <div class="list"><div class="row"><div class="grow"><b>Horario general</b><span class="muted small">${esc(e.horario)}</span></div></div>
@@ -1391,7 +1391,8 @@ root.addEventListener('click', async ev => {
   if (d.sendwelcome) {
     const mensaje = $('wMsg').value.trim(), whatsapp = $('wWa').value.trim();
     if (mensaje.length < 20) return toast('Escribe una breve presentación (al menos un par de frases)');
-    if (whatsapp && !/^https:\/\/chat\.whatsapp\.com\//.test(whatsapp)) return toast('El enlace de WhatsApp debe empezar por https://chat.whatsapp.com/');
+    if (!whatsapp) return toast('Crea el grupo de WhatsApp y pega su enlace antes de enviar la bienvenida');
+    if (!/^https:\/\/chat\.whatsapp\.com\//.test(whatsapp)) return toast('El enlace de WhatsApp debe empezar por https://chat.whatsapp.com/');
     const r = await run('darBienvenida', { entidad: S.cent, email: d.sendwelcome, mensaje, whatsapp }, 'Bienvenida enviada');
     if (r) { S.welcome = null; S.wMsg = ''; render(); }
     return;

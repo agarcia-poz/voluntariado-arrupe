@@ -38,7 +38,7 @@ const CONFIG = {
 };
 
 // Versión del script. La web la compara con la suya para avisar si hay que actualizar Code.gs.
-const VERSION_API = '2026-10-26a';
+const VERSION_API = '2026-10-26b';
 
 const TIPOS_DOC = {
   cert: 'Certificado de delitos de naturaleza sexual',
@@ -337,12 +337,11 @@ const ACCIONES = {
     if (msg.length < 20) throw httpErr_('Escribe una breve presentación antes de enviar');
     if (msg.length > 1500) throw httpErr_('La presentación es demasiado larga (máximo 1500 caracteres)');
     const wa = String(d.whatsapp || '').trim() || String(ent.whatsapp || '');
-    if (wa && !/^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+/.test(wa)) throw httpErr_('El enlace del grupo de WhatsApp debe empezar por https://chat.whatsapp.com/');
-    if (wa && wa !== String(ent.whatsapp || '')) withLock_(() => updateWhere_('Entidades', e => e.id === ent.id, { whatsapp: wa, editadoPor: me.email, editado: new Date() }));
+    if (!wa) throw httpErr_('Crea el grupo de WhatsApp de la entidad y pega su enlace antes de enviar la bienvenida');
+    if (!/^https:\/\/chat\.whatsapp\.com\/[A-Za-z0-9]+/.test(wa)) throw httpErr_('El enlace del grupo de WhatsApp debe empezar por https://chat.whatsapp.com/');
+    if (wa !== String(ent.whatsapp || '')) withLock_(() => updateWhere_('Entidades', e => e.id === ent.id, { whatsapp: wa, editadoPor: me.email, editado: new Date() }));
     const parrafos = esc_(msg).split(/\n{2,}/).map(x => '<p>' + x.replace(/\n/g, '<br>') + '</p>').join('');
-    const waHtml = wa
-      ? `<p>Tenemos un <b>grupo de WhatsApp</b> del voluntariado de ${esc_(ent.nombre)} para organizarnos. Únete con este enlace:</p><p><a href="${esc_(wa)}" style="display:inline-block;background:#25D366;color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:600">Unirme al grupo de WhatsApp</a></p>`
-      : `<p>Vamos a crear un <b>grupo de WhatsApp</b> del voluntariado de ${esc_(ent.nombre)} para organizarnos. Para poder añadirte, comprueba que tu teléfono está en la app, en <b>Mis datos</b>.</p>`;
+    const waHtml = `<p>Tenemos un <b>grupo de WhatsApp</b> del voluntariado de ${esc_(ent.nombre)} para organizarnos. Únete con este enlace:</p><p><a href="${esc_(wa)}" style="display:inline-block;background:#25D366;color:#fff;padding:10px 16px;border-radius:10px;text-decoration:none;font-weight:600">Unirme al grupo de WhatsApp</a></p>`;
     mail_([u.email], 'Bienvenida a ' + ent.nombre,
       `<p>Hola, ${esc_(u.nombre.split(' ')[0])}:</p>${parrafos}
        <p style="margin-top:18px"><b>Horario:</b> ${esc_(ent.horario)}<br><b>Lugar:</b> ${esc_(ent.lugar)}</p>
@@ -856,7 +855,8 @@ function bootstrap_(me) {
     horario: e.horario, cupo: Number(e.cupo) || 0, ig: e.ig, activa: e.activa !== 'no', claves: me.rol === 'pastoral' ? e.claves : undefined,
     coordinadores: users.filter(u => splitList_(u.coordEnts).indexOf(e.id) >= 0 && u.estado === 'activo').map(u => nombreCorto_(u.nombre)),
     ocupadas: asigs.filter(a => a.entidad === e.id && a.estado === 'activa').length,
-    whatsapp: (me.rol === 'pastoral' || splitList_(me.coordEnts).indexOf(e.id) >= 0 || asigs.some(a => a.email === me.email && a.entidad === e.id && a.estado === 'activa')) ? (e.whatsapp || '') : '',
+    // el enlace del grupo solo llega al voluntariado en el correo de bienvenida
+    whatsapp: (me.rol === 'pastoral' || splitList_(me.coordEnts).indexOf(e.id) >= 0) ? (e.whatsapp || '') : '',
     editadoPor: e.editadoPor ? nombreCorto_((users.find(u => u.email === e.editadoPor) || {}).nombre || e.editadoPor) : '', editado: iso_(e.editado)
   }));
 
