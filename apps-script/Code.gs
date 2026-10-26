@@ -38,7 +38,7 @@ const CONFIG = {
 };
 
 // Versión del script. La web la compara con la suya para avisar si hay que actualizar Code.gs.
-const VERSION_API = '2026-10-25c';
+const VERSION_API = '2026-10-26a';
 
 const TIPOS_DOC = {
   cert: 'Certificado de delitos de naturaleza sexual',
@@ -63,6 +63,7 @@ const HOJAS = {
   Multimedia: ['fileId', 'entidad', 'email', 'nombre', 'mime', 'fecha', 'descripcion', 'estado'],
   Incidencias: ['id', 'fecha', 'email', 'nombre', 'rol', 'tipo', 'asunto', 'descripcion', 'pantalla', 'navegador', 'adjunto', 'estado', 'respuesta', 'resueltoPor', 'resuelto'],
   Notificaciones: ['id', 'fecha', 'tipo', 'titulo', 'detalle', 'vista', 'leidaPor', 'resumidaPara'],
+  Comunicados: ['id', 'fecha', 'autor', 'destino', 'entidades', 'asunto', 'destinatarios', 'adjuntos', 'texto'],
   Invitaciones: ['codigo', 'email', 'nombre', 'rol', 'entidades', 'estado', 'creado', 'creadoPor', 'usadoPor', 'usadoEn']
 };
 
@@ -783,6 +784,54 @@ const ACCIONES = {
     });
     return bootstrap_(me);
   },
+  // ── guía del certificado (PDF privado, solo para quien ha iniciado sesión) ──
+  subirGuiaCertificado: (me, d) => {
+    pastoral_(me);
+    if (d.mime !== 'application/pdf') throw httpErr_('La guía debe ser un PDF');
+    const bytes = Utilities.base64Decode(d.base64);
+    if (bytes.length > 10 * 1024 * 1024) throw httpErr_('El PDF supera los 10 MB');
+    const props = PropertiesService.getScriptProperties(), old = props.getProperty('GUIA_CERT_ID');
+    if (old) { try { DriveApp.getFileById(old).setTrashed(true); } catch (e) { } }
+    const f = DriveApp.getFolderById(prop_('FOLDER_ID')).createFile(Utilities.newBlob(bytes, 'application/pdf', 'Guía · Certificado de delitos de naturaleza sexual.pdf'));
+    f.setSharing(DriveApp.Access.PRIVATE, DriveApp.Permission.NONE);
+    props.setProperty('GUIA_CERT_ID', f.getId());
+    log_(me, 'subirGuiaCertificado', f.getId());
+    return bootstrap_(me);
+  },
+  guiaCertificado: (me) => {
+    const id = PropertiesService.getScriptProperties().getProperty('GUIA_CERT_ID');
+    if (!id) throw httpErr_('Pastoral todavía no ha subido la guía');
+    const b = DriveApp.getFileById(id).getBlob();
+    return { nombre: 'Guia-certificado-delitos-sexuales.pdf', base64: Utilities.base64Encode(b.getBytes()) };
+  },
+
+  // ── comunicados de Pastoral por correo ──
+  destinatariosComunicado: (me, d) => { pastoral_(me); return { lista: destinatarios_(d).map(u => ({ email: u.email, nombre: u.nombre })) }; },
+  enviarComunicado: (me, d) => {
+    pastoral_(me);
+    const asunto = String(d.asunto || '').trim().slice(0, 160), texto = String(d.texto || '').trim().slice(0, 20000);
+    if (asunto.length < 3) throw httpErr_('Escribe el asunto');
+    if (texto.length < 5) throw httpErr_('Escribe el mensaje');
+    const imgs = (d.imagenes || []).slice(0, 8), adj = (d.adjuntos || []).slice(0, 8);
+    let total = 0;
+    const blobs = adj.map(a => { const by = Utilities.base64Decode(a.base64); total += by.length; return Utilities.newBlob(by, a.mime || 'application/octet-stream', String(a.nombre || 'archivo').slice(0, 120)); });
+    const inline = {};
+    imgs.forEach(im => { if (!/^image\/(png|jpeg|gif|webp)$/.test(im.mime || '')) throw httpErr_('Las imágenes deben ser PNG, JPG, GIF o WEBP'); const by = Utilities.base64Decode(im.base64); total += by.length; inline[im.id] = Utilities.newBlob(by, im.mime, im.id); });
+    if (total > 20 * 1024 * 1024) throw httpErr_('Entre imágenes y adjuntos se superan los 20 MB');
+    const lista = d.prueba ? [findUser_(me.email) || me] : destinatarios_(d);
+    if (!lista.length) throw httpErr_('No hay nadie en ese grupo');
+    if (!d.prueba && lista.length > 400) throw httpErr_('Como máximo 400 destinatarios por comunicado');
+    const cuota = MailApp.getRemainingDailyQuota();
+    if (lista.length > cuota) throw httpErr_('Hoy solo quedan ' + cuota + ' envíos disponibles en Google. Prueba mañana o reduce el grupo.');
+    lista.forEach(u => {
+      const saludo = d.saludo !== false ? `<p>Hola, ${esc_(String(u.nombre || '').split(' ')[0] || '')}:</p>` : '';
+      mail_([u.email], (d.prueba ? '[PRUEBA] ' : '') + asunto, saludo + mdHtml_(texto, id => 'cid:' + id) + '<p style="margin-bottom:0">Un abrazo,<br>El equipo de Pastoral</p>',
+        d.boton ? 'Abrir la app' : '', '', CONFIG.CORREO_EQUIPO, '', { attachments: blobs, inlineImages: inline });
+    });
+    if (!d.prueba) withLock_(() => append_('Comunicados', { id: Utilities.getUuid().slice(0, 8), fecha: new Date(), autor: me.email, destino: d.destino, entidades: (d.entidades || []).join(','), asunto, destinatarios: lista.length, adjuntos: adj.map(a => a.nombre).join(', '), texto: texto.slice(0, 2000) }));
+    log_(me, 'enviarComunicado', (d.prueba ? 'prueba · ' : '') + lista.length);
+    const out = bootstrap_(me); out.enviados = lista.length; return out;
+  },
   borrarNoticia: (me, d) => {
     pastoral_(me);
     withLock_(() => deleteWhere_('Noticias', n => String(n.id) === String(d.id)));
@@ -818,7 +867,7 @@ function bootstrap_(me) {
   const out = {
     me: { email: me.email, nombre: me.nombre, rol: me.rol, estado: me.estado, curso: me.curso, coordEnts: splitList_(me.coordEnts), foto: me.foto,
       telefono: String(me.telefono || ''), emailContacto: me.emailContacto || '', emergenciaNombre: me.emergenciaNombre || '', emergenciaTelefono: String(me.emergenciaTelefono || ''), avisos: String(me.avisos) !== 'no', avisosReflexion: String(me.avisosReflexion) !== 'no' },
-    config: { horasReferencia: CONFIG.HORAS_REFERENCIA, tiposDoc: TIPOS_DOC, finCurso: CONFIG.FIN_CURSO, hoy: hoyISO_(0) },
+    config: { horasReferencia: CONFIG.HORAS_REFERENCIA, tiposDoc: TIPOS_DOC, finCurso: CONFIG.FIN_CURSO, hoy: hoyISO_(0), guiaCert: !!PropertiesService.getScriptProperties().getProperty('GUIA_CERT_ID') },
     entidades, noticias, version: VERSION_API
   };
 
@@ -921,6 +970,7 @@ function bootstrap_(me) {
       notificaciones: rows_('Notificaciones').slice(-60).reverse().map(n => ({ id: String(n.id), fecha: n.fecha instanceof Date ? n.fecha.toISOString() : String(n.fecha), tipo: n.tipo, titulo: n.titulo, detalle: n.detalle, vista: n.vista, leida: splitList_(n.leidaPor).indexOf(me.email) >= 0 })),
       hojaUrl: SpreadsheetApp.openById(prop_('SHEET_ID')).getUrl(),
       multimediaUrl: carpetaMediaRaiz_().getUrl(),
+      comunicados: rows_('Comunicados').slice(-30).reverse().map(r => ({ id: String(r.id), fecha: r.fecha instanceof Date ? r.fecha.toISOString() : String(r.fecha), destino: r.destino, entidades: splitList_(r.entidades), asunto: r.asunto, destinatarios: Number(r.destinatarios) || 0, adjuntos: r.adjuntos })),
       reflexion: (() => {
         const R = rows_('Reflexiones');
         const activos = new Set(asigs.filter(a => a.estado === 'activa').map(a => a.email));
@@ -1320,6 +1370,34 @@ function resumenNotificaciones_(diario) {
   });
 }
 
+// ───────────────────────── COMUNICADOS ─────────────────────────
+function destinatarios_(d) {
+  const ents = (d.entidades || []).filter(Boolean);
+  const asigs = rows_('Asignaciones').filter(a => a.estado === 'activa' && (!ents.length || ents.indexOf(a.entidad) >= 0));
+  const conPlaza = new Set(asigs.map(a => a.email));
+  return rows_('Usuarios').filter(u => {
+    if (u.estado !== 'activo' || u.rol === 'pastoral') return false;
+    const coordina = splitList_(u.coordEnts).some(e => !ents.length || ents.indexOf(e) >= 0);
+    if (d.destino === 'coord') return coordina;
+    if (d.destino === 'vol') return conPlaza.has(u.email) && !splitList_(u.coordEnts).length;
+    return coordina || conPlaza.has(u.email);
+  });
+}
+// Texto sencillo → HTML de correo: **negrita**, *cursiva*, listas con "- ", [texto](enlace), [imagen:id] y párrafos.
+// La web usa exactamente la misma conversión para la vista previa.
+function mdHtml_(t, imgSrc) {
+  const inl = s => s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*(?!\s)(.+?)\*(?!\*)/g, '$1<i>$2</i>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" style="color:#12679A;font-weight:600">$1</a>')
+    .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" style="color:#12679A">$2</a>');
+  return esc_(t).replace(/\r/g, '').split(/\n{2,}/).map(b => {
+    const img = b.trim().match(/^\[imagen:([a-z0-9]+)\]$/);
+    if (img) return `<p style="margin:16px 0"><img src="${imgSrc(img[1])}" alt="" style="max-width:100%;border-radius:12px;display:block"></p>`;
+    const lines = b.split('\n');
+    if (lines.every(l => /^\s*[-•]\s+/.test(l))) return '<ul style="padding-left:20px;margin:0 0 14px">' + lines.map(l => '<li style="margin-bottom:4px">' + inl(l.replace(/^\s*[-•]\s+/, '')) + '</li>').join('') + '</ul>';
+    return '<p>' + lines.map(inl).join('<br>') + '</p>';
+  }).join('').replace(/<p>\s*\[imagen:([a-z0-9]+)\]\s*<\/p>/g, (m, id) => `<p style="margin:16px 0"><img src="${imgSrc(id)}" alt="" style="max-width:100%;border-radius:12px;display:block"></p>`);
+}
+
 // ───────────────────────── AYUDANTES ─────────────────────────
 function entidad_(id) { const e = rows_('Entidades').find(x => x.id === id); if (!e) throw httpErr_('Entidad no encontrada'); return e; }
 function findUser_(email) { return rows_('Usuarios').find(u => u.email === norm_(email)); }
@@ -1426,7 +1504,7 @@ function json_(o) { return ContentService.createTextOutput(JSON.stringify(o)).se
 function httpErr_(m) { return new Error(m); }
 function authErr_(m) { const e = new Error(m); e.auth = true; return e; }
 
-function mail_(to, subject, html, cta, vista, replyTo, urlBoton) {
+function mail_(to, subject, html, cta, vista, replyTo, urlBoton, extra) {
   to = (to || []).map(norm_).filter(e => e.indexOf('@') > 0 && e.indexOf('correo_de') !== 0);
   if (!to.length) return;
   const boton = cta ? `<p style="margin:24px 0"><a href="${urlBoton || (CONFIG.APP_URL.replace(/\/?$/, '/') + (vista ? '#' + vista : ''))}" style="background:#12679A;color:#fff;padding:11px 18px;border-radius:10px;text-decoration:none;font-weight:600">${cta}</a></p>` : '';
@@ -1436,7 +1514,9 @@ function mail_(to, subject, html, cta, vista, replyTo, urlBoton) {
     ${html}${boton}
     <p style="font-size:12px;color:#6E8193">Servicio de Pastoral · Centro Universitario Sagrada Familia · Úbeda</p></div>`;
   try {
-    const opts = { htmlBody: body, name: CONFIG.REMITENTE };
+    const opts = Object.assign({ htmlBody: body, name: CONFIG.REMITENTE }, extra || {});
+    if (opts.attachments && !opts.attachments.length) delete opts.attachments;
+    if (opts.inlineImages && !Object.keys(opts.inlineImages).length) delete opts.inlineImages;
     const resp = replyTo || CONFIG.CORREO_EQUIPO;
     if (resp) opts.replyTo = resp;
     if (CONFIG.CORREO_EQUIPO) {

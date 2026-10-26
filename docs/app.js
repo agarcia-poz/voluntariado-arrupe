@@ -28,6 +28,9 @@ const I = {
   arrow: '<path d="M5 12h14M12 5l7 7-7 7"/>',
   compass: '<circle cx="12" cy="12" r="10"/><path d="m16.24 7.76-2.12 6.36-6.36 2.12 2.12-6.36 6.36-2.12z"/>',
   chart: '<path d="M3 3v18h18"/><path d="M18 17V9M13 17V5M8 17v-3"/>',
+  send: '<path d="m22 2-7 20-4-9-9-4Z"/><path d="M22 2 11 13"/>',
+  clip: '<path d="m21.44 11.05-9.19 9.19a6 6 0 0 1-8.49-8.49l8.57-8.57A4 4 0 1 1 18 8.84l-8.59 8.57a2 2 0 0 1-2.83-2.83l8.49-8.48"/>',
+  image: '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.09-3.09a2 2 0 0 0-2.82 0L6 21"/>',
   feather: '<path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><path d="M16 8 2 22M17.5 15H9"/>',
   news: '<path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8M15 18h-5M10 6h8v4h-8Z"/>',
   ext: '<path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>',
@@ -44,11 +47,11 @@ const $ = id => document.getElementById(id);
 const COLORS = ['orange', 'magenta', 'purple', 'brown', 'blue', 'red', 'grey', 'green', 'teal'];
 const cvar = c => `var(--e-${COLORS.includes(c) ? c : 'blue'})`;
 const IG = 'https://www.instagram.com/unisafa/';
-const VERSION_API = '2026-10-25c'; // debe coincidir con la de Code.gs
+const VERSION_API = '2026-10-26a'; // debe coincidir con la de Code.gs
 
 /* ───────── estado ───────── */
 let TOKEN = null, D = null;
-const S = { inc: { tipo: 'error', asunto: '', desc: '', file: null }, incOpen: null, insSel: {}, insEnts: {}, thanksConfirm: false, welcome: null, wMsg: '', wWa: undefined, editInfo: false, gal: {}, cf: {}, resign: false, tf: null, delT: null, delM: null, upMsg: '', fent: null, view: null, ent: null, leaving: null, cent: null, assigning: null, insFilter: 'nueva', q: '', editP: null, editE: null, editN: null, delN: null, delSes: null, rejecting: null, att: null, err: '' };
+const S = { com: { destino: 'todos', ents: [], asunto: '', texto: '', saludo: true, boton: true, imgs: [], files: [] }, comConfirm: false, certOpen: false, inc: { tipo: 'error', asunto: '', desc: '', file: null }, incOpen: null, insSel: {}, insEnts: {}, thanksConfirm: false, welcome: null, wMsg: '', wWa: undefined, editInfo: false, gal: {}, cf: {}, resign: false, tf: null, delT: null, delM: null, upMsg: '', fent: null, view: null, ent: null, leaving: null, cent: null, assigning: null, insFilter: 'nueva', q: '', editP: null, editE: null, editN: null, delN: null, delSes: null, rejecting: null, att: null, err: '' };
 try { TOKEN = sessionStorage.getItem('arrupe-token'); } catch (e) { }
 let CODE = null;
 try {
@@ -178,6 +181,7 @@ function demoPastoral(base) {
         { id: 'a5', fecha: new Date(Date.now() - 50 * 3600000).toISOString(), tipo: 'baja', titulo: 'Irene Sola ha dejado Residencia de Ancianos', detalle: 'Baja desde la app', vista: 'personas', leida: true }
       ],
       reflexion: { total: 38, semana: 9, semanas: [2, 4, 5, 7, 11, 9], personas: 21, voluntarios: 34, personas28: 18, asistencias28: 64, trasSesion28: 29, porEntidad: [{ id: 'hogar', n: 12 }, { id: 'ute', n: 9 }, { id: 'apoyo', n: 8 }, { id: 'down', n: 5 }, { id: 'apro', n: 4 }] },
+      comunicados: [{ id: 'c1', fecha: new Date(Date.now() - 2 * 864e5).toISOString(), destino: 'coord', entidades: [], asunto: 'Primeros pasos en la app', destinatarios: 17, adjuntos: 'instrucciones-coordinacion.png' }],
       sesiones: [], hojaUrl: '', carpetaUrl: '', multimediaUrl: ''
     },
     incidencias: [
@@ -189,7 +193,7 @@ function demoPastoral(base) {
 }
 function demoData(role) {
   const base = {
-    config: { horasReferencia: 20, tiposDoc: { cert: 'Certificado de delitos de naturaleza sexual', comp: 'Compromiso de voluntariado' }, finCurso: '2027-06-30', hoy: dIso(0) },
+    config: { horasReferencia: 20, tiposDoc: { cert: 'Certificado de delitos de naturaleza sexual', comp: 'Compromiso de voluntariado' }, finCurso: '2027-06-30', hoy: dIso(0), guiaCert: true },
     entidades: JSON.parse(JSON.stringify(DEMO_ENTS)),
     noticias: [
       { id: 'n1', fecha: dIso(6), titulo: 'Encuentro de inicio del Voluntariado Arrupe', detalle: 'Capilla del Centro Universitario · 13:30', tipo: 'Encuentro' },
@@ -282,6 +286,8 @@ function demoApi(action, d) {
     case 'resolverSolicitud': D2.pastoral.personas.forEach(p => { if (p.email === d.email) p.asignaciones = p.asignaciones.map(a => a.entidad === d.entidad && a.estado === 'solicitada' ? (d.aceptar ? { entidad: a.entidad, estado: 'activa' } : null) : a).filter(Boolean); }); return D2;
     case 'crearInvitaciones': d.lista.forEach(x => D2.pastoral.invitaciones.unshift({ codigo: Math.random().toString(36).slice(2, 5).toUpperCase() + '-' + Math.random().toString(36).slice(2, 5).toUpperCase(), email: x.email, nombre: x.nombre, entidades: x.entidades, estado: 'enviada', creado: todayISO(), usadoPor: '', usadoEn: '' })); return D2;
     case 'reenviarInvitacion': return D2;
+    case 'enviarComunicado': { const n = d.prueba ? 1 : comDest({ destino: d.destino, ents: d.entidades }).length; if (!d.prueba) D2.pastoral.comunicados.unshift({ id: 'c' + Date.now(), fecha: new Date().toISOString(), destino: d.destino, entidades: d.entidades, asunto: d.asunto, destinatarios: n, adjuntos: d.adjuntos.map(a => a.nombre).join(', ') }); const o = Object.assign({}, D2); o.enviados = n; return o; }
+    case 'subirGuiaCertificado': D2.config.guiaCert = true; return D2;
     case 'enviarIncidencia': { const x = { id: 'INC-DEMO-' + Math.random().toString(36).slice(2, 6).toUpperCase(), fecha: new Date().toISOString(), nombre: me.nombre, email: me.email, rol: me.rol, tipo: d.tipo, asunto: d.asunto, descripcion: d.descripcion, pantalla: d.pantalla, estado: 'abierta', respuesta: '', adjunto: '' }; D2.mio.incidencias = [x].concat(D2.mio.incidencias || []); if (D2.incidencias) D2.incidencias.unshift(x); const o = Object.assign({}, D2); o.ticket = x.id; return o; }
     case 'resolverIncidencia': (D2.incidencias || []).forEach(x => { if (x.id === d.id) { x.estado = d.reabrir ? 'abierta' : 'resuelta'; if (d.respuesta) x.respuesta = d.respuesta; } }); return D2;
     case 'marcarNotificaciones': D2.pastoral.notificaciones.forEach(n => { if (d.todas || (d.ids || []).includes(n.id)) n.leida = true; }); return D2;
@@ -390,7 +396,7 @@ function nav() {
   const c = caps();
   if (c.pend) return [['espera', 'Tu cuenta', 'home'], ['datos', 'Mis datos', 'user'], ['explorar', 'Dónde servir', 'compass'], ['noticias', 'Noticias', 'news'], ['soporte', 'Ayuda', 'life']];
   const n = [];
-  if (c.isP) n.push(['panel', 'Panel', 'chart'], ['avisos', 'Avisos', 'bell'], ['ins', 'Inscripciones', 'inbox'], ['personas', 'Personas', 'users'], ['invitaciones', 'Invitaciones', 'mail'], ['entidades', 'Entidades', 'building']);
+  if (c.isP) n.push(['panel', 'Panel', 'chart'], ['avisos', 'Avisos', 'bell'], ['ins', 'Inscripciones', 'inbox'], ['personas', 'Personas', 'users'], ['comunicados', 'Comunicados', 'send'], ['invitaciones', 'Invitaciones', 'mail'], ['entidades', 'Entidades', 'building']);
   if (c.isC) n.push(['cinicio', 'Mi entidad', 'building'], ['equipo', 'Equipo', 'users'], ['chorario', 'Horarios', 'calendar'], ['asistencia', 'Asistencia', 'check']);
   if (c.isVol) n.push(['vinicio', 'Mi voluntariado', 'home'], ['reflexion', 'Con qué me quedo', 'feather'], ['horario', 'Mi horario', 'calendar'], ['docs', 'Documentos', 'file'], ['horas', 'Mis horas', 'clock']);
   if (c.isVol || c.isC) n.push(['fotos', 'Fotos y vídeos', 'camera']);
@@ -552,12 +558,13 @@ function vVinicio() {
 }
 function vDocs() {
   const docs = D.mio.docs, T = D.config.tiposDoc;
-  const help = { cert: 'Se pide en la sede electrónica del Ministerio de Justicia con certificado digital o Cl@ve. Es gratuito.', comp: 'Pide el modelo a tu coordinación, fírmalo y súbelo escaneado o en una foto legible.' };
+  const help = { cert: 'Se pide en la sede electrónica del Ministerio de Justicia con Cl@ve. Es gratuito y lo descargas al momento en PDF.', comp: 'Pide el modelo a tu coordinación, fírmalo y súbelo escaneado o en una foto legible.' };
   const card = t => { const d = docs[t];
     if (t === 'comp') { const c = D.mio.compromiso; return `<div class="card doc"><div class="top"><div style="display:grid;gap:4px;min-width:0;flex:1 1 240px"><h2>${esc(T[t])}</h2><p class="muted small">Se completa y se firma aquí mismo, en la app. Te llegará una copia por correo.</p></div>${c ? '<span class="pill ok">Firmado</span>' : pill(d.estado)}</div>
       ${c ? `<p class="small muted">${ic('check', 16)} Firmado el ${fmtLong(c.fecha)}. Vigente hasta el ${fmtLong(c.hasta)}.</p><button class="btn ghost" data-go="compromiso" style="justify-self:start">Ver mi compromiso</button>`
         : `<button class="btn primary" data-go="compromiso" style="justify-self:start">${ic('pen', 18)}Completar y firmar</button>`}</div>`; }
     return `<div class="card doc"><div class="top"><div style="display:grid;gap:4px;min-width:0;flex:1 1 240px"><h2>${esc(T[t])}</h2><p class="muted small">${help[t] || ''}</p></div>${pill(d.estado)}</div>
+    ${t === 'cert' ? certSteps() : ''}
     ${d.estado === 'rech' && d.nota ? `<p class="err">Motivo: ${esc(d.nota)}</p>` : ''}
     ${d.estado === 'ok' ? `<p class="small muted">${ic('check', 16)} Validado por el Servicio de Pastoral${d.fecha ? ' el ' + fmtLong(d.fecha) : ''}.</p>` :
       `<label class="file btn ${d.estado === 'rev' ? 'ghost' : 'primary'}" for="up-${t}">${ic('upload', 18)}${d.estado === 'rev' ? 'Sustituir archivo' : 'Subir PDF o foto'}<input type="file" id="up-${t}" data-up="${t}" accept="application/pdf,image/jpeg,image/png,image/heic,image/heif,image/webp"></label><span class="hint">Máximo 10 MB.</span>`}
@@ -565,6 +572,35 @@ function vDocs() {
   return header('Documentación', 'Tus documentos', 'Son necesarios para empezar a servir. Se entregan una sola vez por curso, aunque estés en varios voluntariados.') +
     `<div class="note">${ic('lock', 18)}<span>Tu certificado y tus datos se guardan de forma privada. <b>Solo el Servicio de Pastoral puede verlos.</b> Tu coordinación únicamente ve si están entregados y validados.</span></div>
     <div class="grid g2">${Object.keys(T).map(card).join('')}</div>`;
+}
+const CERT_URL = 'https://sede.mjusticia.gob.es/es/tramites/certificado-registro-central';
+const CERT_PASOS = [
+  ['Entra en la sede del Ministerio de Justicia', 'Abre la página del trámite con el botón de abajo.'],
+  ['Elige “Tramitación On-line con Cl@ve para personas físicas”', ''],
+  ['Identifícate con Cl@ve', 'Cl@ve Móvil, Cl@ve PIN, certificado digital o DNI electrónico.'],
+  ['Rellena el teléfono móvil y, si quieres, el correo electrónico', ''],
+  ['En “Finalidad”, selecciona “Trabajo y/o contacto habitual con menores”', 'Si te lo piden, puedes indicar también el país al que se destina.'],
+  ['Deja sin marcar la apostilla y pulsa “Siguiente”', 'La apostilla solo hace falta para presentarlo en el extranjero.'],
+  ['Si ya habías pedido uno antes y te sirve, puedes descargarlo directamente', ''],
+  ['Revisa los datos y pulsa “Confirmar”', ''],
+  ['Pulsa “Descargar certificado”', 'Se descarga un PDF con firma electrónica.'],
+  ['Súbelo aquí, en esta misma tarjeta', 'Vale el PDF tal cual lo descargas; no hace falta imprimirlo.']
+];
+function certSteps() {
+  return `<details class="cert-steps" ${S.certOpen ? 'open' : ''}><summary>${ic('file', 18)}<span><b>Cómo pedirlo, paso a paso</b><span class="hint"> · unos 5 minutos</span></span></summary>
+    <ol>${CERT_PASOS.map(([t, d]) => `<li><b>${esc(t)}</b>${d ? `<span>${esc(d)}</span>` : ''}</li>`).join('')}</ol>
+    <div class="actions"><a class="btn primary sm" href="${CERT_URL}" target="_blank" rel="noopener">${ic('ext', 16)}Ir a la sede del Ministerio</a>${D.config.guiaCert ? `<button class="btn ghost sm" data-act="guia-cert">${ic('file', 16)}Ver la guía con capturas (PDF)</button>` : ''}</div></details>`;
+}
+async function abrirGuia() {
+  if (DEMO) return toast('En la demostración no está disponible la guía');
+  const w = window.open('', '_blank');
+  $('busy').hidden = false;
+  try {
+    const r = await api('guiaCertificado');
+    const bin = atob(r.base64), arr = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+    const url = URL.createObjectURL(new Blob([arr], { type: 'application/pdf' }));
+    if (w) w.location.href = url; else { const a = document.createElement('a'); a.href = url; a.download = r.nombre; a.click(); }
+  } catch (e) { if (w) w.close(); toast(e.message); } finally { $('busy').hidden = true; }
 }
 function vHoras() {
   const ents = [...new Set(misEnts().concat(D.mio.horas.map(h => h.entidad)))], ref = D.config.horasReferencia;
@@ -669,6 +705,12 @@ function vAvisos() {
     `<div class="card"><h2>Sin leer${sin.length ? ` · ${sin.length}` : ''}</h2>${sin.length ? `<div class="list">${sin.map(avisoRow).join('')}</div>` : '<div class="empty">Estáis al día.</div>'}</div>
     ${leidas.length ? `<details class="card"><summary style="cursor:pointer;font-weight:600">Leídos recientemente (${leidas.length})</summary><div class="list">${leidas.map(avisoRow).join('')}</div></details>` : ''}`;
 }
+function guiaCard() {
+  const has = D.config.guiaCert;
+  return `<div class="card"><div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;align-items:center"><div style="display:grid;gap:4px;min-width:0;flex:1 1 300px"><h2>Guía del certificado de delitos sexuales</h2>
+    <span class="muted small">${has ? 'Subida. El voluntariado la ve en Documentos, junto a los pasos para pedir el certificado.' : 'Sube el PDF con capturas para que el voluntariado pueda consultarlo en Documentos. Se guarda en vuestro Drive privado.'}</span></div>
+    <div class="actions">${has ? `<button class="btn ghost sm" data-act="guia-cert">${ic('file', 16)}Ver</button>` : ''}<label class="file btn ${has ? 'ghost' : 'primary'} sm" for="guiaFile">${ic('upload', 16)}${has ? 'Sustituir' : 'Subir PDF'}<input type="file" id="guiaFile" accept="application/pdf"></label></div></div></div>`;
+}
 function reflStats() {
   const r = D.pastoral.reflexion; if (!r) return '';
   const pct = (a, b) => b ? Math.round(a / b * 100) : 0, max = Math.max(1, ...r.semanas);
@@ -700,6 +742,7 @@ function vPanel() {
       ${pp.docs.map(x => `<div class="row"><span class="pill info">Documento</span><div class="grow"><b>${esc(x.p.nombre)}</b><span class="small muted">${esc(D.config.tiposDoc[x.t])}</span></div><button class="btn ghost sm" data-editp="${esc(x.p.email)}">Revisar</button></div>`).join('')}
     </div>` : '<div class="empty">Nada pendiente. Buen trabajo.</div>'}</div>
   ${reflStats()}
+  ${guiaCard()}
   <div class="grid g2">
    <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><h2>Ocupación por entidad</h2><button class="btn ghost sm" data-go="entidades">Gestionar</button></div>
      <div class="list">${D.entidades.filter(e => e.activa).map(e => `<div class="row" style="--c:${cvar(e.color)}"><div class="grow" style="display:grid;gap:6px"><div style="display:flex;justify-content:space-between;gap:8px"><b style="display:inline">${esc(e.nombre)}</b><span class="tnum small muted">${e.ocupadas}/${e.cupo}</span></div><div class="bar"><i style="width:${e.cupo ? Math.min(100, e.ocupadas / e.cupo * 100) : 0}%"></i></div></div></div>`).join('')}</div></div>
@@ -1127,6 +1170,110 @@ async function uploadMedia(files) {
   if (ok) toast(S.upMsg + (DEMO ? ' (demostración: no se guarda nada)' : ''));
 }
 
+/* --- comunicados de Pastoral --- */
+// Misma conversión que mdHtml_ en Code.gs: lo que ves en la vista previa es lo que llega.
+function mdHtml(t, imgSrc) {
+  const esc_ = s => String(s || '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const inl = s => s.replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*(?!\s)(.+?)\*(?!\*)/g, '$1<i>$2</i>')
+    .replace(/\[([^\]]+)\]\((https?:\/\/[^\s)]+)\)/g, '<a href="$2" style="color:#12679A;font-weight:600">$1</a>')
+    .replace(/(^|[\s(])(https?:\/\/[^\s<)]+)/g, '$1<a href="$2" style="color:#12679A">$2</a>');
+  return esc_(t).replace(/\r/g, '').split(/\n{2,}/).map(b => {
+    const img = b.trim().match(/^\[imagen:([a-z0-9]+)\]$/);
+    if (img) return `<p style="margin:16px 0"><img src="${imgSrc(img[1])}" alt="" style="max-width:100%;border-radius:12px;display:block"></p>`;
+    const lines = b.split('\n');
+    if (lines.every(l => /^\s*[-•]\s+/.test(l))) return '<ul style="padding-left:20px;margin:0 0 14px">' + lines.map(l => '<li style="margin-bottom:4px">' + inl(l.replace(/^\s*[-•]\s+/, '')) + '</li>').join('') + '</ul>';
+    return '<p>' + lines.map(inl).join('<br>') + '</p>';
+  }).join('').replace(/<p>\s*\[imagen:([a-z0-9]+)\]\s*<\/p>/g, (m, id) => `<p style="margin:16px 0"><img src="${imgSrc(id)}" alt="" style="max-width:100%;border-radius:12px;display:block"></p>`);
+}
+function comDest(cm) {
+  const P = (D.pastoral.personas || []).filter(p => p.estado === 'activo' && p.rol !== 'pastoral'), ents = cm.ents;
+  return P.filter(p => {
+    const coord = (p.coordEnts || []).some(e => !ents.length || ents.includes(e));
+    const plaza = p.asignaciones.some(a => a.estado === 'activa' && (!ents.length || ents.includes(a.entidad)));
+    return cm.destino === 'coord' ? coord : cm.destino === 'vol' ? plaza && !(p.coordEnts || []).length : coord || plaza;
+  });
+}
+function comEmailHtml(cm, nombre) {
+  const saludo = cm.saludo ? `<p>Hola, ${esc(String(nombre || '').split(' ')[0])}:</p>` : '';
+  const boton = cm.boton ? `<p style="margin:24px 0"><a href="${location.origin + location.pathname}" style="background:#12679A;color:#fff;padding:11px 18px;border-radius:10px;text-decoration:none;font-weight:600">Abrir la app</a></p>` : '';
+  const body = cm.texto.trim() ? mdHtml(cm.texto, id => (cm.imgs.find(x => x.id === id) || {}).url || '') : '<p style="color:#8195A9">Tu mensaje aparecerá aquí…</p>';
+  return `<!doctype html><html><head><meta charset="utf-8"><base target="_blank"><style>body{margin:0;padding:18px;background:#fff}a{pointer-events:none}</style></head><body><div style="font-family:Arial,sans-serif;font-size:15px;line-height:1.55;color:#152433;max-width:560px">
+    <div style="height:6px;border-radius:6px;background:linear-gradient(90deg,#E58A00,#D9007A,#3A2A85,#8E5A32,#12679A,#D9312B,#55595D,#25995A)"></div>
+    <p style="font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#6E8193;margin-top:18px">Voluntariado Arrupe</p>
+    ${saludo}${body}<p style="margin-bottom:0">Un abrazo,<br>El equipo de Pastoral</p>${boton}
+    <p style="font-size:12px;color:#6E8193">Servicio de Pastoral · Centro Universitario Sagrada Familia · Úbeda</p></div></body></html>`;
+}
+const kb = n => n > 1048576 ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
+function vComunicados() {
+  const cm = S.com, dest = comDest(cm), first = dest[0];
+  const total = cm.imgs.concat(cm.files).reduce((a, f) => a + f.size, 0);
+  const hist = D.pastoral.comunicados || [];
+  const DEST = { todos: 'Todos', coord: 'Coordinación', vol: 'Voluntariado' };
+  return header('Servicio de Pastoral', 'Comunicados', 'Escribe a todo el voluntariado, solo a la coordinación o solo a los voluntarios. A la derecha ves el correo tal y como llegará.') +
+  `<div class="com-grid"><div class="card">
+    <div style="display:grid;gap:8px"><span style="font-weight:650;font-size:.88rem">Para</span>
+      <div class="filters" role="group" aria-label="Destinatarios">${Object.entries(DEST).map(([k, l]) => `<button data-comdest="${k}" aria-pressed="${cm.destino === k}">${l}</button>`).join('')}</div>
+      <details class="com-ents" ${cm.ents.length ? 'open' : ''}><summary class="small">${cm.ents.length ? 'Solo de: ' + cm.ents.map(x => esc(E(x).nombre)).join(', ') : 'De todas las entidades'} <span class="hint">· cambiar</span></summary>
+        <div class="checks" style="margin-top:8px">${D.entidades.filter(e => e.activa).map(e => `<label><input type="checkbox" data-coment="${esc(e.id)}" ${cm.ents.includes(e.id) ? 'checked' : ''}>${esc(e.nombre)}</label>`).join('')}</div></details>
+      <span class="pill ${dest.length ? 'info' : 'warn'}" style="justify-self:start">${dest.length} ${dest.length === 1 ? 'persona' : 'personas'}</span></div>
+    <div class="field"><label for="comAs">Asunto</label><input type="text" id="comAs" maxlength="160" value="${esc(cm.asunto)}" placeholder="Ej.: Encuentro de inicio del Voluntariado Arrupe"></div>
+    <div class="field"><label for="comTx">Mensaje</label>
+      <div class="toolbar" role="toolbar" aria-label="Formato">
+        <button type="button" data-fmt="b" title="Negrita"><b>N</b></button><button type="button" data-fmt="i" title="Cursiva"><i>C</i></button>
+        <button type="button" data-fmt="ul" title="Lista">• Lista</button><button type="button" data-fmt="a" title="Enlace">${ic('ext', 15)}Enlace</button>
+        <label class="file" for="comImg" title="Insertar imagen">${ic('image', 15)}Imagen<input type="file" id="comImg" accept="image/png,image/jpeg,image/gif,image/webp" multiple></label>
+        <label class="file" for="comFile" title="Adjuntar archivo">${ic('clip', 15)}Adjuntar<input type="file" id="comFile" multiple></label>
+      </div>
+      <textarea id="comTx" style="min-height:260px;border-top-left-radius:0;border-top-right-radius:0" placeholder="Escribe tu mensaje. Deja una línea en blanco entre párrafos.">${esc(cm.texto)}</textarea>
+      <span class="hint">**negrita**, *cursiva*, líneas que empiezan por “- ” para listas, [texto](https://…) para enlaces. Las imágenes aparecen donde está su marca.</span></div>
+    ${cm.imgs.length || cm.files.length ? `<div class="chips">${cm.imgs.map(f => `<span class="chip" style="--c:var(--e-blue)">${ic('image', 14)}${esc(f.name)} · ${kb(f.size)} <button class="x" data-comrm="img|${f.id}" aria-label="Quitar ${esc(f.name)}">×</button></span>`).join('')}${cm.files.map((f, i) => `<span class="chip" style="--c:var(--e-purple)">${ic('clip', 14)}${esc(f.name)} · ${kb(f.size)} <button class="x" data-comrm="file|${i}" aria-label="Quitar ${esc(f.name)}">×</button></span>`).join('')}</div>
+      <span class="hint ${total > 20 * 1048576 ? 'err' : ''}">${kb(total)} de 20 MB</span>` : ''}
+    <div class="checks"><label><input type="checkbox" id="comSal" ${cm.saludo ? 'checked' : ''}>Saludo personal (“Hola, nombre:”)</label><label><input type="checkbox" id="comBtn" ${cm.boton ? 'checked' : ''}>Botón “Abrir la app”</label></div>
+    ${S.comConfirm ? `<div class="confirm" style="background:var(--brand-soft)"><span>Vas a enviar <b>${esc(cm.asunto)}</b> a <b>${dest.length} ${dest.length === 1 ? 'persona' : 'personas'}</b>. ¿Seguimos?</span><button class="btn primary sm" data-act="com-send-yes">Sí, enviar</button><button class="btn ghost sm" data-act="com-send-no">Cancelar</button></div>` : ''}
+    <div class="actions"><button class="btn primary" data-act="com-send" ${dest.length ? '' : 'disabled'}>${ic('send', 18)}Enviar a ${dest.length} ${dest.length === 1 ? 'persona' : 'personas'}</button><button class="btn ghost" data-act="com-test">${ic('mail', 18)}Enviarme una prueba</button></div>
+  </div>
+  <div class="com-preview"><div class="card" style="padding:0;overflow:hidden">
+    <div class="mail-head"><span class="eyebrow">Vista previa</span>
+      <div><span>De</span><b>Voluntariado Arrupe · Pastoral CUSAFA</b></div><div><span>Para</span>${first ? esc(first.nombre) + (dest.length > 1 ? ` y ${dest.length - 1} más` : '') : '—'}</div>
+      <div class="subj">${esc(cm.asunto) || '<span class="hint">Sin asunto</span>'}</div></div>
+    <iframe id="comPrev" title="Vista previa del correo" sandbox="allow-same-origin" srcdoc="${esc(comEmailHtml(cm, first ? first.nombre : 'Lucía'))}"></iframe>
+    ${cm.files.length ? `<div class="mail-att">${cm.files.map(f => `<span>${ic('clip', 14)}${esc(f.name)}</span>`).join('')}</div>` : ''}
+  </div></div></div>
+  ${hist.length ? `<div class="card"><h2>Enviados</h2><div class="list">${hist.map(h => `<div class="row"><span class="pill info">${DEST[h.destino] || 'Todos'}</span><div class="grow"><b>${esc(h.asunto)}</b><span class="muted small">${haceTxt(h.fecha)} · ${h.destinatarios} ${h.destinatarios === 1 ? 'persona' : 'personas'}${h.entidades.length ? ' · ' + h.entidades.map(x => esc(E(x).nombre)).join(', ') : ''}${h.adjuntos ? ' · ' + esc(h.adjuntos) : ''}</span></div></div>`).join('')}</div></div>` : ''}`;
+}
+function comPreview() {
+  const f = $('comPrev'); if (!f) return;
+  const dest = comDest(S.com), first = dest[0];
+  f.srcdoc = comEmailHtml(S.com, first ? first.nombre : 'Lucía');
+  const s = document.querySelector('.mail-head .subj'); if (s) s.innerHTML = esc(S.com.asunto) || '<span class="hint">Sin asunto</span>';
+}
+function comWrap(pre, post, ph) {
+  const t = $('comTx'); if (!t) return;
+  const a = t.selectionStart, b = t.selectionEnd, sel = t.value.slice(a, b) || ph;
+  t.value = t.value.slice(0, a) + pre + sel + post + t.value.slice(b);
+  t.focus(); t.setSelectionRange(a + pre.length, a + pre.length + sel.length);
+  S.com.texto = t.value; comPreview();
+}
+function comInsert(txt) {
+  const t = $('comTx'); const a = t ? t.selectionStart : S.com.texto.length;
+  const v = S.com.texto; S.com.texto = v.slice(0, a) + txt + v.slice(a);
+}
+const readB64 = f => new Promise((res, rej) => { const rd = new FileReader(); rd.onload = () => res(String(rd.result)); rd.onerror = rej; rd.readAsDataURL(f); });
+async function comSend(prueba) {
+  const cm = S.com;
+  cm.asunto = $('comAs').value.trim(); cm.texto = $('comTx').value;
+  if (cm.asunto.length < 3) return toast('Escribe el asunto');
+  if (cm.texto.trim().length < 5) return toast('Escribe el mensaje');
+  const total = cm.imgs.concat(cm.files).reduce((a, f) => a + f.size, 0);
+  if (total > 20 * 1048576) return toast('Entre imágenes y adjuntos se superan los 20 MB');
+  const usadas = cm.imgs.filter(im => cm.texto.includes('[imagen:' + im.id + ']'));
+  const data = { destino: cm.destino, entidades: cm.ents, asunto: cm.asunto, texto: cm.texto, saludo: cm.saludo, boton: cm.boton, prueba,
+    imagenes: usadas.map(im => ({ id: im.id, mime: im.mime, base64: im.url.split(',')[1] })),
+    adjuntos: await Promise.all(cm.files.map(async f => ({ nombre: f.name, mime: f.type || 'application/octet-stream', base64: (await readB64(f.file)).split(',')[1] }))) };
+  const r = await run('enviarComunicado', data, r => prueba ? 'Prueba enviada a tu correo' : `Comunicado enviado a ${r && r.enviados} ${r && r.enviados === 1 ? 'persona' : 'personas'}`);
+  if (r && !prueba) { S.com = { destino: cm.destino, ents: [], asunto: '', texto: '', saludo: true, boton: true, imgs: [], files: [] }; render.animate = true; render(); celebrate(); }
+}
+
 /* --- ayuda e incidencias --- */
 const TIPO_INC = { error: ['bad', 'Algo no funciona'], sugerencia: ['info', 'Sugerencia'], duda: ['warn', 'Duda'] };
 function incRow(x, admin) {
@@ -1163,7 +1310,7 @@ function vSoporte() {
 }
 
 /* ───────── render ───────── */
-const VIEWS = { reflexion: vReflexion, soporte: vSoporte, avisos: vAvisos, horario: vHorario, chorario: vChorario, compromiso: vCompromiso, datos: vDatos, fotos: vFotos, espera: vEspera, explorar: vExplorar, vinicio: vVinicio, docs: vDocs, horas: vHoras, cinicio: vCinicio, equipo: vEquipo, asistencia: vAsistencia, panel: vPanel, ins: vIns, personas: vPersonas, invitaciones: vInvitaciones, entidades: vEntidades, noticias: vNoticias };
+const VIEWS = { comunicados: vComunicados, reflexion: vReflexion, soporte: vSoporte, avisos: vAvisos, horario: vHorario, chorario: vChorario, compromiso: vCompromiso, datos: vDatos, fotos: vFotos, espera: vEspera, explorar: vExplorar, vinicio: vVinicio, docs: vDocs, horas: vHoras, cinicio: vCinicio, equipo: vEquipo, asistencia: vAsistencia, panel: vPanel, ins: vIns, personas: vPersonas, invitaciones: vInvitaciones, entidades: vEntidades, noticias: vNoticias };
 function render() {
   const root = $('root');
   if (!D) {
@@ -1225,6 +1372,9 @@ root.addEventListener('click', async ev => {
     if (n && !n.leida) { n.leida = true; api('marcarNotificaciones', { ids: [id] }).then(r => { if (r && r.me && !DEMO) D = r; }).catch(() => { }); }
     return go(VIEWS[vista] ? vista : 'panel');
   }
+  if (d.comdest) { S.com.destino = d.comdest; S.comConfirm = false; return render(); }
+  if (d.fmt) { const f = d.fmt; if (f === 'b') comWrap('**', '**', 'texto en negrita'); else if (f === 'i') comWrap('*', '*', 'texto en cursiva'); else if (f === 'ul') comWrap('\n\n- ', '\n- segundo punto\n\n', 'primer punto'); else comWrap('[', '](https://)', 'texto del enlace'); return; }
+  if (d.comrm) { const [k, v] = d.comrm.split('|'); if (k === 'img') { S.com.imgs = S.com.imgs.filter(x => x.id !== v); S.com.texto = S.com.texto.replace(new RegExp('\\n?\\n?\\[imagen:' + v + '\\]\\n?\\n?'), '\n\n'); } else S.com.files.splice(+v, 1); return render(); }
   if (d.inctipo) { S.inc.tipo = d.inctipo; return render(); }
   if (d.incopen) { S.incOpen = S.incOpen === d.incopen ? null : d.incopen; return render(); }
   if (d.incres) { const r = ($('incR-' + d.incres) || {}).value || ''; return run('resolverIncidencia', { id: d.incres, respuesta: r.trim() }, r.trim() ? 'Resuelta. Le hemos enviado tu respuesta.' : 'Marcada como resuelta'); }
@@ -1252,6 +1402,12 @@ root.addEventListener('click', async ev => {
     case 'inv-parse': { S.invText = $('invText').value; S.inv = parseInv(S.invText); return render(); }
     case 'inv-back': S.inv = null; return render();
     case 'cancel-delt': S.delT = null; return render();
+    case 'guia-cert': S.certOpen = true; return abrirGuia();
+    case 'guia-up': return;
+    case 'com-send': S.com.asunto = $('comAs').value.trim(); S.com.texto = $('comTx').value; if (S.com.asunto.length < 3) return toast('Escribe el asunto'); if (S.com.texto.trim().length < 5) return toast('Escribe el mensaje'); S.comConfirm = true; return render();
+    case 'com-send-no': S.comConfirm = false; return render();
+    case 'com-send-yes': S.comConfirm = false; render(); return comSend(false);
+    case 'com-test': return comSend(true);
     case 'inc-send': {
       const f = S.inc; f.asunto = $('incAs').value.trim(); f.desc = $('incDe').value.trim();
       if (f.asunto.length < 4) return toast('Escribe un asunto breve');
@@ -1408,7 +1564,7 @@ root.addEventListener('click', async ev => {
   }
 });
 root.addEventListener('keydown', ev => { if (ev.key === 'Enter' && ev.target.matches('tr[data-editp]')) ev.target.click(); });
-root.addEventListener('change', ev => {
+root.addEventListener('change', async ev => {
   const t = ev.target;
   if (t.dataset.up && t.files.length) {
     const f = t.files[0];
@@ -1420,6 +1576,15 @@ root.addEventListener('change', ev => {
     rd.readAsDataURL(f);
   }
   if (t.dataset.inssel) { const sel = S.insSel[S.insFilter]; t.checked ? sel.add(t.dataset.inssel) : sel.delete(t.dataset.inssel); S.thanksConfirm = false; render(); return; }
+  if (t.id === 'comImg' && t.files.length) {
+    for (const f of [...t.files]) { if (!/^image\/(png|jpeg|gif|webp)$/.test(f.type)) { toast(f.name + ': usa PNG, JPG, GIF o WEBP'); continue; } const id = 'img' + Math.random().toString(36).slice(2, 7); S.com.imgs.push({ id, name: f.name, size: f.size, mime: f.type, url: await readB64(f) }); comInsert('\n\n[imagen:' + id + ']\n\n'); }
+    t.value = ''; return render();
+  }
+  if (t.id === 'comFile' && t.files.length) { [...t.files].forEach(f => S.com.files.push({ name: f.name, size: f.size, type: f.type, file: f })); t.value = ''; return render(); }
+  if (t.dataset.coment) { const e = t.dataset.coment; S.com.ents = t.checked ? S.com.ents.concat(e) : S.com.ents.filter(x => x !== e); S.comConfirm = false; return render(); }
+  if (t.id === 'comSal') { S.com.saludo = t.checked; return comPreview(); }
+  if (t.id === 'comBtn') { S.com.boton = t.checked; return comPreview(); }
+  if (t.id === 'guiaFile' && t.files.length) { const f = t.files[0]; if (f.type !== 'application/pdf') return toast('La guía debe ser un PDF'); const b = (await readB64(f)).split(',')[1]; return run('subirGuiaCertificado', { mime: f.type, base64: b }, 'Guía subida. Ya la puede abrir todo el voluntariado.'); }
   if (t.id === 'incFile') { S.inc.file = t.files[0] || null; S.inc.asunto = $('incAs').value; S.inc.desc = $('incDe').value; render(); return; }
   if (t.id === 'insEntF') { S.insEnt = t.value; S.insSel[S.insFilter] && S.insSel[S.insFilter].clear(); render(); return; }
   if (t.dataset.preent) { S.insEnts[t.dataset.preent] = new Set(t.value ? t.value.split(',') : []); S.insSel[S.insFilter] && S.insSel[S.insFilter].add(t.dataset.preent); render(); return; }
@@ -1439,6 +1604,7 @@ root.addEventListener('input', ev => {
   if (/^c(Nombre|Dni|Tel|Curso|Act|Firma)$/.test(ev.target.id)) readCf();
   if (ev.target.id === 'wMsg') S.wMsg = ev.target.value;
   if (ev.target.id === 'incAs') S.inc.asunto = ev.target.value;
+  if (ev.target.id === 'comAs' || ev.target.id === 'comTx') { S.com[ev.target.id === 'comAs' ? 'asunto' : 'texto'] = ev.target.value; S.comConfirm = false; clearTimeout(comPreview.t); comPreview.t = setTimeout(comPreview, 160); }
   if (ev.target.id === 'refl') S.rtxt = ev.target.value;
   if (ev.target.id === 'reflW') S.rword = ev.target.value;
   if (ev.target.id === 'incDe') S.inc.desc = ev.target.value;

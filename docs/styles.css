@@ -324,3 +324,30 @@ textarea{min-height:96px;resize:vertical;line-height:1.5}
 .refl-grid .kpis{grid-template-columns:repeat(2,minmax(0,1fr))}
 .refl-stats .kpi b{font-size:2.1rem}
 @media (max-width:900px){.refl-grid{grid-template-columns:1fr}}
+
+/* certificado */
+.cert-steps{border:1px solid var(--line);border-radius:16px;background:var(--surface-2);overflow:hidden}
+.cert-steps summary{list-style:none;display:flex;gap:10px;align-items:center;padding:12px 14px;font-size:.95rem}
+.cert-steps summary::-webkit-details-marker{display:none}
+.cert-steps summary::after{content:"";margin-left:auto;width:8px;height:8px;border-right:2px solid var(--fg-3);border-bottom:2px solid var(--fg-3);transform:rotate(45deg);transition:transform .25s var(--ease)}
+.cert-steps[open] summary::after{transform:rotate(-135deg)}
+.cert-steps ol{margin:0;padding:0 16px 4px 44px;display:grid;gap:10px;counter-reset:p}
+.cert-steps li{font-size:.92rem;line-height:1.4}
+.cert-steps li::marker{font-family:var(--display);font-weight:800;color:var(--brand)}
+.cert-steps li span{display:block;color:var(--fg-2);font-size:.86rem}
+.cert-steps .actions{padding:10px 14px 14px}
+/* comunicados */
+.com-grid{display:grid;gap:20px;grid-template-columns:minmax(0,1fr) minmax(0,1fr);align-items:start}
+@media (max-width:1100px){.com-grid{grid-template-columns:1fr}}
+.com-preview{position:sticky;top:20px}
+.com-preview iframe{display:block;width:100%;height:560px;border:0;background:#fff}
+.mail-head{padding:16px 18px;border-bottom:1px solid var(--line);display:grid;gap:3px;font-size:.88rem;color:var(--fg-2);background:var(--surface-2)}
+.mail-head > div span{display:inline-block;width:46px;color:var(--fg-3)}
+.mail-head .subj{font-family:var(--display);font-weight:750;font-size:1.12rem;color:var(--fg);margin-top:4px}
+.mail-att{display:flex;flex-wrap:wrap;gap:6px;padding:12px 16px;border-top:1px solid var(--line);font-size:.84rem}
+.mail-att span{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--line-2);border-radius:10px;padding:5px 10px;background:var(--surface)}
+.toolbar{display:flex;flex-wrap:wrap;gap:2px;padding:6px;border:1.5px solid var(--line-2);border-bottom:0;border-radius:12px 12px 0 0;background:var(--surface-2)}
+.toolbar button,.toolbar label{display:inline-flex;align-items:center;gap:6px;border:0;background:transparent;border-radius:8px;padding:6px 10px;min-height:34px;font-size:.86rem;font-weight:650;color:var(--fg-2)}
+.toolbar button:hover,.toolbar label:hover{background:var(--surface);color:var(--fg)}
+.com-ents summary{cursor:pointer;color:var(--fg-2)}
+.chip .x{border:0;background:transparent;color:inherit;font-size:1rem;line-height:1;padding:0 0 0 4px;min-height:0}
